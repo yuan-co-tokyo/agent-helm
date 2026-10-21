@@ -41,7 +41,11 @@ describe('approval detection',() => {
  });
  it('requires a terminal, sequential option block and uses only the last 40 lines',() => {
   const text = fixture('codex-exec-approval');
-  for (const changed of [text + 'Done\n',text + '> \n',text.replace('2. Yes','4. Yes'),text + '\n'.repeat(41)]) expect(detect(changed)).toBeNull();
+  for (const changed of [text + 'Done\n',text + '> \n',text.replace('2. Yes','4. Yes'),text.replace('$ pnpm test','$ pnpm test' + '\nline'.repeat(40))]) expect(detect(changed)).toBeNull();
+ });
+ it('ignores trailing blank pane rows and extended footers',() => {
+  expect(detect(fixture('codex-exec-approval') + '\n'.repeat(60))?.agentKind).toBe('codex');
+  expect(detect(fixture('claude-bash-approval-noframe.estimated') + '\nEsc to cancel · Tab to amend\n','claude')?.options).toHaveLength(3);
  });
  it('joins wrapped questions and options',() => {
   const text = 'Would you like to run\nthe following command?\n› 1. Yes, proceed\n  2. Yes, and do not ask again\n     for this command (p)\n';
