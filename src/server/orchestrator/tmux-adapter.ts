@@ -25,7 +25,7 @@ export class TmuxOrchestratorAdapter implements OrchestratorAdapter {
  async getStatus() { return { ...await this.resolve(), target: this.describeTarget(), checkedAt: new Date().toISOString() }; }
  private async capture(paneId: string, lines?: number) {
   const count = clampLines(lines);
-  const text = stripAnsi(await this.runner.run(['capture-pane','-p','-J','-t',paneId,'-S',`-${count}`])).replace(/\n+$/,'');
+  const text = stripAnsi(await this.runner.run(['capture-pane','-p','-J','-t',paneId,'-S',`-${count}`])).replace(/\n+$/,'').split('\n').slice(-count).join('\n');
   return { text, lines: count, source: 'tmux' as const, capturedAt: new Date().toISOString() };
  }
  async readScreen(lines?: number) {

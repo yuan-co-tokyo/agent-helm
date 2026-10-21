@@ -58,3 +58,7 @@ it('enforces keys and injected approval detector',async () => {
  expect((await blocked.inspectScreen()).inputReady.reason).toBe('approval_pending');
  expect(await blocked.sendInstruction('hello')).toMatchObject({ reason: 'approval_pending' });
 });
+it('limits captured history plus visible screen to the requested lines',async () => {
+ const { adapter } = setup(async args => args[0] === 'capture-pane' ? 'a\nb\nc\nd\n\n' : undefined);
+ expect((await adapter.readScreen(2)).text).toBe('c\nd');
+});
