@@ -1,0 +1,6 @@
+{
+ "listen": { "host": "127.0.0.1", "port": 8790 },
+ "agtx": { "baseUrl": "http://127.0.0.1:8787", "projectName": "agent-helm", "timeoutMs": 5000 },
+ "orchestrator": { "tmuxSocket": "agtx", "session": "agent-helm", "window": "orchestrator" },
+ "limits": { "instructionMaxChars": 8000 }
+}
