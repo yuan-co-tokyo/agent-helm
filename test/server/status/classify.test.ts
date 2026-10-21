@@ -26,6 +26,8 @@ it('explains attention and avoids backlog dependency alerts', () => {
  expect(attentionFor(task({ depsSatisfied: false, blockingTasks: ['other'] }), 'running', null).item?.reason).toContain('other');
  expect(attentionFor(task({ depsSatisfied: false, status: 'backlog' }), 'unknown', null)).toMatchObject({ reason: expect.any(String), item: null });
  expect(attentionFor(task(), 'stale', null, false).reason).toBe('TUI未接続');
+ expect(attentionFor(task(), 'stale', null, false).item?.kind).toBe('stale');
+ expect(attentionFor(task({ status: 'done', phaseAgeSecs: 3600 }), 'stale', null)).toMatchObject({ reason: expect.any(String), item: null });
 });
 it('limits detail and pane work', () => {
  expect(needsDetail(task())).toBe(false);

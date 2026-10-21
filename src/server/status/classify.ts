@@ -27,6 +27,8 @@ export function attentionFor(task: Task, displayState: DisplayState, approval: A
  else if (displayState === 'error') { kind = 'error'; reason = 'phase exited'; }
  else if (displayState === 'stale') {
   kind = 'stale'; reason = task.tuiConnected === false || agtxTuiConnected === false ? 'TUI未接続' : `状態更新が ${task.phaseAgeSecs} 秒前`;
+  // Backlog/done tasks are not progressing, so a stale runtime is not something to act on.
+  actionable = active(task);
  } else if (task.escalationNote) reason = `エスカレーション: ${task.escalationNote}`;
  else if (task.depsSatisfied === false) {
   const ids = 'blockingTasks' in task ? (task.blockingTasks.length ? task.blockingTasks : task.referencedTasks) : [];
