@@ -1,5 +1,17 @@
-import type { SessionResponse } from '../../shared/api.js';
-export interface HeaderProps { session: SessionResponse | null; error?: string | null }
-export function Header({ session, error }: HeaderProps) {
- return <header><h1>Agent Helm</h1><p>{session?.target.project.name ?? '接続確認中'} · agtx {session?.versions.agtx ?? '未接続'}</p>{error && <p role="alert">{error}</p>}</header>;
+import type { SessionResponse, StateResponse } from '../../shared/api.js';
+import { SUPPORTED_AGTX_VERSION } from '../../shared/constants.js';
+import { formatTime } from '../state/labels.js';
+export interface HeaderProps { session: SessionResponse | null; sessionError?: string | null; state: StateResponse | null; connected: boolean; lastSuccessAt: Date | null; mock?: boolean }
+export function Header({ session, sessionError, state, connected, lastSuccessAt, mock }: HeaderProps) {
+ const version = state?.agtx.version ?? session?.versions.agtx;
+ const supported = session?.versions.agtxSupported ?? SUPPORTED_AGTX_VERSION;
+ const orchestratorLabels = { running: '実行中', not_found: '見つかりません', ambiguous: '対象を特定できません', error: 'エラー' };
+ return <header><h1>Agent Helm</h1><p>{session?.target.project.name ?? '接続確認中'}</p>
+ {mock && <p className="mock-banner" role="status">モックデータ表示中</p>}
+ <div className="health"><span>agtx: {state ? state.agtx.reachable ? '到達' : '到達不可' : '確認中'}</span><span>TUI: {state?.agtx.tuiConnected == null ? '不明' : state.agtx.tuiConnected ? '接続' : '未接続'}</span><span>Orchestrator: {state ? orchestratorLabels[state.orchestrator.state] : '確認中'}</span></div>
+ {state?.orchestrator.reason && <p>{state.orchestrator.reason}</p>}
+ <p role="status">{version ? version !== supported ? `agtx バージョン ${version} は未検証（対応: ${supported}）` : `agtx ${version}` : 'バージョン不明'}</p>
+ {sessionError && <p role="alert">{sessionError}</p>}
+ {!connected ? <p role="alert">切断中・{lastSuccessAt ? `最終取得 ${formatTime(lastSuccessAt)}` : '未取得'}</p> : <p>最終取得 {lastSuccessAt ? formatTime(lastSuccessAt) : '--:--:--'}</p>}
+ </header>;
 }
