@@ -9,7 +9,8 @@ export const config = () => loadConfig({ env: {}, readFile: () => JSON.stringify
 export function makeApp(staticRoot?: string) {
  const logs: string[] = [];
  const gateway = new MockAgtxGateway();
- const app = createApp({ config: config(), gateway, orchestrator: new MockOrchestratorAdapter(), csrfToken: 'test-csrf-secret', appVersion: '0.1.0', logger: createLogger(line => logs.push(line)), staticRoot });
- return { app, logs, gateway };
+ const orchestrator = new MockOrchestratorAdapter();
+ const app = createApp({ config: config(), gateway, orchestrator, csrfToken: 'test-csrf-secret', appVersion: '0.1.0', logger: createLogger(line => logs.push(line)), staticRoot });
+ return { app, logs, gateway, orchestrator };
 }
 export const headers = { host: '127.0.0.1:8790', origin: 'http://127.0.0.1:8790', 'x-helm-csrf': 'test-csrf-secret', 'content-type': 'application/json' };

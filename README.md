@@ -47,3 +47,17 @@ AGTX_CONTRACT=1 AGTX_PROJECT=agent-helm pnpm test
 E2E は desktop/mobile の画面雛形を確認します。実 agtx 契約テストは明示的に有効化した場合だけ GET を実行し、入力は送りません。モック HTTP テストはエフェメラルポートを使用します。
 
 `src/shared/api.ts` が UI/BFF 契約、`src/server/agtx` と `src/server/orchestrator/types.ts` が外部アクセス契約です。後続ルートは `src/server/routes/*` の登録関数を置き換えて実装できます。ペイン応答の複数形式を暫定サポートしていますが、実機の成功応答は統合時に確認が必要です。
+
+Orchestrator input uses an exact tmux session/window match and requires a single live
+pane with an empty `❯` or `›` prompt. Approval prompts, menus, completion lists and
+unrecognized screens block instructions. Placeholder text can therefore also block
+input. Detection is conservative and depends on terminal layout; an external input
+can still race the final target check. The adapter never starts or selects a session.
+
+Instructions are pasted through a temporary tmux buffer and followed by one Enter.
+Terminal editors must support bracketed paste for multiline instructions: tmux
+converts LF to CR, which editors normalize as pasted newlines; applications without
+bracketed paste may act on each newline immediately. A failure after paste begins
+returns `unknown` and is never retried automatically. Request IDs deduplicate requests
+within this server process (the last 500 IDs); restarting or cache eviction removes
+that protection. Instruction bodies are not logged.
