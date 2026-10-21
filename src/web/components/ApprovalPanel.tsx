@@ -20,6 +20,7 @@ function TargetPanel({target,projectName}:{target:ApprovalTarget;projectName?:st
  const [selection,setSelection] = useState<Selection|null>(null);
  const [state,setState] = useState<SendState>({kind:'idle'});
  const [checking,setChecking] = useState(false);
+ const [checkFailed,setCheckFailed] = useState(false);
  const [blockedRevision,setBlockedRevision] = useState<number|null>(null);
  const inFlight = useRef(false);
  const load = useCallback(async ():Promise<TargetView>=> {
@@ -37,9 +38,10 @@ function TargetPanel({target,projectName}:{target:ApprovalTarget;projectName?:st
  const gone = state.kind==='gone' || (polling.error instanceof HelmApiError && [404,410].includes(polling.error.status));
  async function checkLatest() {
   if (inFlight.current || checking) return;
-  setChecking(true);
+  setChecking(true); setCheckFailed(false);
   try { const data = await load(); setVerified({data,baseline:polling.revision}); setState({kind:'idle'}); setBlockedRevision(null); }
-  catch(error) { setState(error instanceof HelmApiError && [404,410].includes(error.status) ? {kind:'gone'} : state.kind==='unknown' ? {kind:'unknown'} : classifySendError(error)); }
+  // A failed read sends nothing, so keep the current send state rather than reporting an unknown send.
+  catch(error) { if (error instanceof HelmApiError && [404,410].includes(error.status)) setState({kind:'gone'}); else setCheckFailed(true); }
   finally { setChecking(false); }
  }
  async function send() {
@@ -61,7 +63,8 @@ function TargetPanel({target,projectName}:{target:ApprovalTarget;projectName?:st
    <p>{view ? view.approval?.question ?? '承認待ちは検出されていません' : '取得中…'}</p>
    <pre>{excerpt(view?.pane ?? null)}</pre>
    <div className="approval-options">{meanings.map(meaning=><div className="approval-group" key={meaning}>{view?.approval?.options.filter(option=>option.meaning===meaning).map(option=><button key={option.key} className={meaning==='approve_always' ? 'helm-warning' : ''} disabled={disabled} onClick={()=> { if (view?.approval) { setVerified(null); setSelection({view,prompt:view.approval,option}); } }}>[{option.key}] {option.label}{' '}{badges[meaning] && <span className="approval-badge"> {badges[meaning]}</span>}</button>)}</div>)}</div>
-   <button disabled={!!selection || checking} onClick={()=>void checkLatest()}>最新を確認</button></>}
+   <button disabled={!!selection || checking} onClick={()=>void checkLatest()}>最新を確認</button>
+   {checkFailed && <p className="helm-warning">最新の画面を取得できませんでした</p>}</>}
   {state.kind==='sent' && state.after && <><h3>送信後の画面</h3><pre>{state.after.text}</pre></>}
   {selection && <ConfirmDialog selection={selection} projectName={projectName} sending={state.kind==='sending'} onCancel={()=> { if (!inFlight.current) setSelection(null); }} onSend={()=>void send()} />}
  </section>;

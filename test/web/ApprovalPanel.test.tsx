@@ -63,3 +63,9 @@ test('validates task IDs and resets state on target changes',async()=> {
  view.rerender(<ApprovalPanel target={{kind:'task',taskId:id}} />);
  await screen.findByText('承認待ちは検出されていません'); expect(apiGet).toHaveBeenCalledWith(`/api/tasks/${id}`);
 });
+test('failed manual check without a prior send does not report an unknown send',async()=> {
+ await setup(); vi.mocked(apiGet).mockRejectedValueOnce(new HelmApiError(0,'network'));
+ fireEvent.click(screen.getByRole('button',{name:'最新を確認'})); await screen.findByText('最新の画面を取得できませんでした');
+ expect(screen.queryByText(/結果不明/)).toBeNull();
+ expect((screen.getByRole('button',{name:'[1] Yes 承認'}) as HTMLButtonElement).disabled).toBe(false);
+});
