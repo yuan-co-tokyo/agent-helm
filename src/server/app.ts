@@ -16,6 +16,7 @@ import { registerOrchestratorRoutes } from './routes/orchestrator.js';
 import { registerApprovalRoutes } from './routes/approvals.js';
 import { apiError } from './routes/errors.js';
 export interface AppDeps {
+ approval?: { settleMs?: number; sendTimeoutMs?: number; sleep?: (ms: number) => Promise<void> };
  config: HelmConfig; gateway: AgtxGateway; orchestrator: OrchestratorAdapter;
  csrfToken: string; appVersion: string; staticRoot?: string | null; logger: Logger;
 }

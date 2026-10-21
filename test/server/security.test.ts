@@ -19,11 +19,11 @@ describe('security',() => {
  });
  it('allows valid JSON POST; protects all mutation verbs',async () => {
   const { app } = makeApp();
-  expect((await app.request('/api/approvals/respond',{ method: 'POST', headers: { ...headers, 'content-type': 'Application/JSON; charset=utf-8' }, body: '{}' })).status).toBe(501);
+  expect((await app.request('/api/approvals/respond',{ method: 'POST', headers: { ...headers, 'content-type': 'Application/JSON; charset=utf-8' }, body: '{}' })).status).toBe(400);
   for (const method of ['OPTIONS','PUT','DELETE','PATCH']) expect((await app.request('/api/session',{ method, headers: { host: headers.host } })).status).toBe(403);
  });
  it('accepts matching localhost and IPv6 origins',async () => {
-  for (const host of ['localhost:8790','[::1]:8790']) expect((await makeApp().app.request('/api/approvals/respond',{ method: 'POST', headers: { ...headers, host, origin: 'http://' + host }, body: '{}' })).status).toBe(501);
+  for (const host of ['localhost:8790','[::1]:8790']) expect((await makeApp().app.request('/api/approvals/respond',{ method: 'POST', headers: { ...headers, host, origin: 'http://' + host }, body: '{}' })).status).toBe(400);
  });
  it('rejects oversized body without trusting content-length',async () => {
   const result = await makeApp().app.request('/api/approvals/respond',{ method: 'POST', headers, body: JSON.stringify({ text: 'x'.repeat(65536) }) });

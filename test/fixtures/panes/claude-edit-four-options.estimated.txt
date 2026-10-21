@@ -1,0 +1,6 @@
+Would you like to edit this file?
+README.md
+❯ 1. Yes
+  2. Yes, for this session
+  3. No
+  4. Show details
