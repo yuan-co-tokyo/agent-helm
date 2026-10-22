@@ -1,0 +1,8 @@
+* { box-sizing: border-box; }
+body { margin: 0; background: #f4f6f8; color: #192531; font-family: system-ui, sans-serif; line-height: 1.6; }
+header, main { max-width: 1200px; margin: auto; padding: 1rem; }
+h1 { font-size: 1.7rem; } h2 { font-size: 1.15rem; }
+section { min-width: 0; margin-bottom: 1rem; padding: 1.25rem; border: 1px solid #ccd4dd; border-radius: .5rem; background: white; overflow-wrap: anywhere; }
+.columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+pre, code { font-family: ui-monospace, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 767px) { .columns { grid-template-columns: 1fr; gap: 0; } }

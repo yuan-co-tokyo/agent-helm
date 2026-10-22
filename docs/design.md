@@ -62,11 +62,14 @@ interface AgtxGateway {
   listTasks(): Promise<TaskSummary[]>;
   getTask(taskId: string): Promise<TaskDetail>;
   readPane(taskId: string, lines?: number): Promise<PaneSnapshot>;
-  sendKey(taskId: string, key: AgtxKey): Promise<SendResult>;   // agtx の閉じたキー集合のみ
+  sendKey(taskId: string, key: AgtxKey): Promise<KeySendResult>;   // agtx の閉じたキー集合のみ
 }
 ```
 
-- `HttpAgtxGateway` が HTTP 差異・タイムアウト・エラー正規化を閉じ込める。エラーは `GatewayError{kind: 'unreachable'|'timeout'|'not_found'|'conflict'|'bad_response'|'unknown'}`。
+- `HttpAgtxGateway` が HTTP 差異・タイムアウト・エラー正規化を閉じ込める。エラーは `GatewayError{kind: 'unreachable'|'timeout'|'not_found'|'conflict'|'bad_response'|'unknown'|'project_not_found'|'project_ambiguous'}`。
+- プロジェクト名の一致が 0 件なら `project_not_found`、複数なら `project_ambiguous`。正常に解決した UUID のみを URL に使う。
+- `/pane` 成功形式は実機で未確認のため、文字列／`{content}`／`{text}`／`{lines:string[]}`／`{output}` を受け付け、ANSI と制御文字を除去した `PaneSnapshot` に正規化する。それ以外は `bad_response`。
+- Gateway/Adapter の送信結果には `requestId` を含めず、ルート層で付与する。
 - **タスクへの自由テキスト送信は提供しない**（agtx の `{text}` は Enter ループを行うため）。
 - `sendKey` のタイムアウト・接続断は `outcome: 'unknown'` を返し、**自動再試行しない**。
 - 対応バージョン：1.0.6。起動時に `/api/health.version` を確認し、不一致は警告表示（動作は継続）。契約テストは `test/contract/` で実 agtx に対して任意実行（`AGTX_CONTRACT=1`）。
@@ -78,8 +81,8 @@ interface OrchestratorAdapter {
   describeTarget(): OrchestratorTarget;              // socket/session/window（表示用）
   getStatus(): Promise<OrchestratorStatus>;          // 'running'|'not_found'|'ambiguous'|'error' + paneId, currentCommand
   readScreen(lines?: number): Promise<PaneSnapshot>;
-  sendInstruction(text: string): Promise<SendResult>;
-  sendKey(key: OrchestratorKey): Promise<SendResult>;
+  sendInstruction(text: string): Promise<Omit<SendResult, 'requestId'>>;
+  sendKey(key: OrchestratorKey): Promise<Omit<SendResult, 'requestId'>>;
 }
 ```
 
