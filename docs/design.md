@@ -132,6 +132,8 @@ interface OrchestratorAdapter {
 | `blocked` | `phase_status=blocked` または `agent_state=blocked`（理由不明） |
 | `error` | `phase_status=exited` かつ status が planning/running |
 | `reviewing` | status=review かつ working |
+| `awaiting_input` | planning/running の exited、既知のエージェントで入力欄が空（完了は端末で確認） |
+| `input_pending` | 同条件で入力欄に文字あり。プレースホルダーも含め要対応に残す |
 | `phase_done` | `phase_status=ready` |
 | `running` | `phase_status=working` |
 | `idle` | `phase_status=idle` |

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { StateResponse, TaskDetailView } from '../../shared/api.js';
-import { isUuid } from '../../shared/constants.js';
+import type { StateResponse } from '../../shared/api.js';
 export interface ReadApi { apiGet<T>(path: string): Promise<T> }
 interface PollState<T> { data: T | null; lastSuccessAt: Date | null; error: Error | null; connected: boolean; failures: number }
 function initial<T>(): PollState<T> { return { data: null, lastSuccessAt: null, error: null, connected: false, failures: 0 }; }
@@ -46,4 +45,3 @@ export function usePolling<T>(fetcher: () => Promise<T>, { intervalMs, maxBackof
  return snapshot.key === key && enabled ? snapshot.value : initial<T>();
 }
 export function useAppState(api: ReadApi) { return usePolling(() => api.apiGet<StateResponse>('/api/state'),{ intervalMs: 3000 }); }
-export function useTaskDetail(api: ReadApi, taskId: string | null) { return usePolling(() => api.apiGet<TaskDetailView>(`/api/tasks/${taskId}`),{ intervalMs: 1500, enabled: !!taskId && isUuid(taskId), key: taskId }); }

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 import type { TaskDetail } from '../../../src/server/agtx/types.js';
-import { attentionFor, classifyTask, isAwaitingInput, needsDetail, needsPaneCheck } from '../../../src/server/status/classify.js';
+import { attentionFor, classifyTask, inputState, needsDetail, needsPaneCheck } from '../../../src/server/status/classify.js';
 import { task, prompt } from './fixtures.js';
 it.each<[Partial<TaskDetail>, string]>([
  [{ phaseAgeSecs: 30 },'running'], [{ phaseAgeSecs: 31 },'stale'], [{ tuiConnected: false },'stale'],
@@ -46,17 +46,24 @@ it('explains terminal-only approval attention',()=> {
 
 it.each(['codex','claude',null])('only treats known exited agents as awaiting input: %s',agent=> {
  const current = task({agent,phaseStatus:'exited'});
- const input = {task:current,approval:null,agtxTuiConnected:true,disconnected:false,awaitingInput:true};
+ const input = {task:current,approval:null,agtxTuiConnected:true,disconnected:false,input:'empty' as const};
  expect(classifyTask(input)).toBe(agent ? 'awaiting_input' : 'error');
  expect(classifyTask({...input,approval:prompt})).toBe('approval');
  expect(attentionFor(current,'awaiting_input',null)).toEqual({reason:'入力待ち（agtx は exited と報告）',item:null});
 });
 
 it.each([
- ['codex-idle-input',true], ['shell-prompt',false], ['codex-exec-approval.real',false], ['codex-trust.real',false]
+ ['codex-idle-input','not_empty'], ['shell-prompt',null], ['codex-exec-approval.real',null], ['codex-trust.real',null]
 ])('recognizes input readiness from %s', (name,expected)=> {
- expect(isAwaitingInput(readFileSync(`test/fixtures/panes/${name}.txt`,'utf8'))).toBe(expected);
+ expect(inputState(readFileSync(`test/fixtures/panes/${name}.txt`,'utf8'))).toBe(expected);
 });
 it('excludes menus and completions from input waiting',()=> {
- for (const text of ['❯ 1. One\n  2. Two','❯ \n /help']) expect(isAwaitingInput(text)).toBe(false);
+ for (const text of ['❯ 1. One\n  2. Two','❯ \n /help']) expect(inputState(text)).toBe(null);
+});
+
+it.each(['❯ ', '› ', '❯ abc', '› Ask Codex…'])('distinguishes empty and nonempty input: %s', text => {
+ const current = task({phaseStatus:'exited',agent:'codex'});
+ const state = classifyTask({task:current,approval:null,agtxTuiConnected:true,disconnected:false,input:inputState(text)});
+ expect(state).toBe(text.trim().length === 1 ? 'awaiting_input' : 'input_pending');
+ expect(attentionFor(current,state,null).item?.kind ?? null).toBe(state === 'input_pending' ? 'input' : null);
 });

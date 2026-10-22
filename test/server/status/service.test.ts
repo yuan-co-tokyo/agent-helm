@@ -80,16 +80,27 @@ it('does not retain a connected TUI after health fails',async ()=> {
  gateway.failNext('getHealth',new GatewayError('unreachable'));
  expect((await service.getState()).agtx).toMatchObject({reachable:false,tuiConnected:null});
 });
-it.each(['codex','claude',null])('classifies exited input for %s in list and detail',async agent=> {
+it.each(['codex','claude',null].flatMap(agent => [false,true].map(nonempty => ({agent,nonempty}))))('classifies exited input $agent / $nonempty in list and detail',async ({agent,nonempty})=> {
  const {gateway,service,detect} = setup(); detect.mockReturnValue(null);
  gateway.setTasks([task({agent,phaseStatus:'exited'})]);
- gateway.setPane(task().id,agent==='claude' ? '❯ ' : '› Ask Codex to do anything');
- const expected = agent ? 'awaiting_input' : 'error';
+ gateway.setPane(task().id,(agent==='claude' ? '❯ ' : '› ') + (nonempty ? 'Ask anything' : ''));
+ const expected = agent ? (nonempty ? 'input_pending' : 'awaiting_input') : 'error';
  const state = await service.getState(); expect(state.tasks[0]?.displayState).toBe(expected);
  expect((await service.getTaskDetail(task().id)).displayState).toBe(expected);
- if (agent) expect(state.attention).toEqual([]);
+ if (agent) expect(state.attention.map(item => item.kind)).toEqual(nonempty ? ['input'] : []);
  gateway.failNext('readPane',new GatewayError('timeout'));
  expect((await service.getState()).tasks[0]?.displayState).toBe('error');
  gateway.failNext('readPane',new GatewayError('timeout'));
  expect((await service.getTaskDetail(task().id)).displayState).toBe('error');
+});
+
+it.each([true,false])('ignores stale detail health after failure: %s',async tuiConnected => {
+ const {gateway,service} = setup();
+ gateway.setHealth({...gateway.health,tuiConnected});
+ expect((await service.getTaskDetail(task().id)).displayState).toBe(tuiConnected ? 'running' : 'stale');
+ gateway.failNext('getHealth',new GatewayError('unreachable'));
+ const detail = await service.getTaskDetail(task().id);
+ expect(detail.displayState).toBe('running');
+ expect(detail.attentionReason).toBeNull();
+ expect(gateway.lastHealth?.tuiConnected).toBe(tuiConnected);
 });

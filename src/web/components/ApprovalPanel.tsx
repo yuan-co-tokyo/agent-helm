@@ -5,7 +5,7 @@ import { apiGet, apiPost, HelmApiError } from '../api/client.js';
 import { usePaneScreenPolling, type PaneScreenPolling } from '../hooks/usePaneScreenPolling.js';
 import { classifySendError, formatTime, fromResult, sendMessage, type SendState } from '../lib/send-state.js';
 import './console-approval.css';
-export interface ApprovalPanelProps { target:ApprovalTarget|null; projectName?:string; screen?:PaneScreenPolling<OrchestratorScreenResponse> }
+export interface ApprovalPanelProps { target:ApprovalTarget|null; projectName?:string; screen?:PaneScreenPolling<OrchestratorScreenResponse | TaskDetailView> }
 interface TargetView { title:string; agent:string|null; approval:ApprovalPrompt|null; pane:PaneSnapshot|null }
 interface Selection { view:TargetView; prompt:ApprovalPrompt; option:ApprovalOption }
 const meanings: ApprovalMeaning[] = ['deny','unknown','approve','approve_always'];
@@ -31,10 +31,12 @@ function TargetPanel({target,projectName,screen}:ApprovalPanelProps & {target:Ap
   const screen = await apiGet<OrchestratorScreenResponse>('/api/orchestrator/screen');
   return {title:'Orchestrator',agent:screen.approval?.agentKind ?? null,approval:screen.approval,pane:screen};
  },[kind,taskId]);
- const shared = kind==='orchestrator' && !!screen;
+ const shared = !!screen;
  const own = usePaneScreenPolling(load,1500,!shared && !selection && state.kind!=='unknown' && state.kind!=='gone' && !checking);
  const screenData = screen?.data;
- const mapped = useMemo(()=>screenData ? {title:'Orchestrator',agent:screenData.approval?.agentKind ?? null,approval:screenData.approval,pane:screenData} : null,[screenData]);
+ const mapped = useMemo<TargetView|null>(()=>screenData ? ('title' in screenData
+  ? {title:screenData.title,agent:screenData.agent,approval:screenData.approval,pane:screenData.pane}
+  : {title:'Orchestrator',agent:screenData.approval?.agentKind ?? null,approval:screenData.approval,pane:screenData}) : null,[screenData]);
  const polling = shared && screen ? {...screen,data:mapped} : own;
  const [held,setHeld] = useState<TargetView|null>(null);
  const [verified,setVerified] = useState<{data:TargetView;baseline:number}|null>(null);

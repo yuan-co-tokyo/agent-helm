@@ -3,7 +3,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { ApprovalPanel } from '../../src/web/components/ApprovalPanel.js';
 import { apiGet, apiPost, HelmApiError } from '../../src/web/api/client.js';
-import type { OrchestratorScreenResponse } from '../../src/shared/api.js';
+import type { OrchestratorScreenResponse, TaskDetailView } from '../../src/shared/api.js';
+import { mockTasks } from '../../src/web/api/mock.js';
 import { isUuid } from '../../src/shared/constants.js';
 vi.mock('../../src/web/api/client.js',async importOriginal=>({...await importOriginal<object>(),apiGet:vi.fn(),apiPost:vi.fn()}));
 const pane:OrchestratorScreenResponse = {text:'<script>untrusted</script>\nconfirm output',capturedAt:'2026-10-21T10:00:00Z',lines:2,source:'tmux',inputReady:{ok:false},approval:{confirm:'key',agentKind:'codex',kind:'approval',detail:'',question:'Allow?',fingerprint:'original',capturedAt:'2026-10-21T10:00:00Z',options:[{key:'1',label:'Yes',meaning:'approve',shortcut:null,warn:false,sendable:true},{key:'2',label:'No',meaning:'deny',shortcut:null,warn:false,sendable:true},{key:'3',label:'Always',meaning:'approve_always',shortcut:null,warn:true,sendable:true},{key:'4',label:'Other',meaning:'unknown',shortcut:null,warn:false,sendable:true}]}};
@@ -92,4 +93,51 @@ test('explains trust Enter confirmation and holds unconfirmed actions until refr
  expect(screen.getByText('unchanged output')).toBeTruthy();
  expect((screen.getByRole('button',{name:'[1] Yes 承認'}) as HTMLButtonElement).disabled).toBe(true);
  expect(apiPost).toHaveBeenCalledTimes(1);
+});
+
+function sharedTask() {
+ const data:TaskDetailView = {...mockTasks[0]!,title:'Shared task',agent:'codex',approval:pane.approval,pane};
+ const polling = {data,error:null as unknown,lastSuccessAt:pane.capturedAt,revision:1,seq:1,startedSeq:()=>2,stale:false,refresh:vi.fn()};
+ const target = {kind:'task' as const,taskId:'e0c2e422-06b1-4c32-b0f2-5fdfbfbff09e'};
+ const view = render(<ApprovalPanel target={target} screen={polling} />);
+ return {polling,data,update:()=>view.rerender(<ApprovalPanel target={target} screen={{...polling}} />)};
+}
+test('shared task freezes the question and fingerprint, and waits for a poll started after send',async()=> {
+ const {polling,data,update} = sharedTask();
+ const dialog = openDialog();
+ polling.data = {...data,approval:{...pane.approval!,question:'Changed?',fingerprint:'changed'}};
+ polling.revision++; polling.seq=2; update();
+ expect(dialog.getByText('Allow?')).toBeTruthy();
+ expect(dialog.queryByText('Changed?')).toBeNull();
+ vi.mocked(apiPost).mockResolvedValue({outcome:'sent_unconfirmed',requestId:'x',after:pane});
+ fireEvent.click(dialog.getByRole('button',{name:'送信'})); await act(async()=>{});
+ expect(apiPost).toHaveBeenCalledWith('/api/approvals/respond',expect.objectContaining({fingerprint:'original'}));
+ expect(screen.getByText('キーは届きましたが画面が変わっていません。端末で確認してください')).toBeTruthy();
+ expect(polling.refresh).toHaveBeenCalledOnce();
+ expect((screen.getByRole('button',{name:'[1] Yes 承認'}) as HTMLButtonElement).disabled).toBe(true);
+ polling.revision++; update();
+ expect((screen.getByRole('button',{name:'[1] Yes 承認'}) as HTMLButtonElement).disabled).toBe(true);
+ polling.seq=3; polling.revision++; update();
+ expect((screen.getByRole('button',{name:'[1] Yes 承認'}) as HTMLButtonElement).disabled).toBe(false);
+ expect(apiGet).not.toHaveBeenCalled();
+});
+test('shared task unknown remains locked across polls until manual verification succeeds',async()=> {
+ const {polling,data,update} = sharedTask();
+ vi.mocked(apiPost).mockRejectedValue(new HelmApiError(0,'network'));
+ fireEvent.click(openDialog().getByRole('button',{name:'送信'})); await act(async()=>{});
+ polling.seq=3; polling.revision++; update();
+ expect((screen.getByRole('button',{name:'[1] Yes 承認'}) as HTMLButtonElement).disabled).toBe(true);
+ vi.mocked(apiGet).mockRejectedValueOnce(new HelmApiError(0,'network'));
+ fireEvent.click(screen.getByRole('button',{name:'最新を確認'})); await act(async()=>{});
+ expect((screen.getByRole('button',{name:'[1] Yes 承認'}) as HTMLButtonElement).disabled).toBe(true);
+ vi.mocked(apiGet).mockResolvedValue(data);
+ fireEvent.click(screen.getByRole('button',{name:'最新を確認'})); await act(async()=>{});
+ expect((screen.getByRole('button',{name:'[1] Yes 承認'}) as HTMLButtonElement).disabled).toBe(false);
+});
+test.each([404,410])('shared task handles a gone poll: %s',status=> {
+ const {polling,update} = sharedTask();
+ polling.error = new HelmApiError(status,'gone'); polling.stale=true; update();
+ expect(screen.getByText('対象は終了しています')).toBeTruthy();
+ expect(screen.queryByRole('button',{name:'[1] Yes 承認'})).toBeNull();
+ expect(apiGet).not.toHaveBeenCalled();
 });

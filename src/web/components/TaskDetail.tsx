@@ -5,7 +5,7 @@ import { formatTime } from '../state/labels.js';
 import { stripControl } from '../text.js';
 import { ApprovalPanel } from './ApprovalPanel.js';
 import { PrBadge, StatusBadge } from './StatusBadge.js';
-export interface TaskDetailProps { taskId: string | null; detail: TaskDetailView | null; summary?: TaskView | null; connected: boolean; lastSuccessAt: Date | null; error: Error | null; onClose: () => void; renderApproval?: (target: ApprovalTarget, prompt: ApprovalPrompt | null) => ReactNode }
+export interface TaskDetailProps { taskId: string | null; detail: TaskDetailView | null; summary?: TaskView | null; connected: boolean; lastSuccessAt: Date | string | null; error: Error | null; onClose: () => void; renderApproval?: (target: ApprovalTarget, prompt: ApprovalPrompt | null) => ReactNode }
 export function TaskDetail({ taskId, detail, summary, connected, lastSuccessAt, error, onClose, renderApproval }: TaskDetailProps) {
  const dialog = useRef<HTMLDialogElement>(null);
  const pane = useRef<HTMLPreElement>(null);

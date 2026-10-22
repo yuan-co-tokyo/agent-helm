@@ -6,7 +6,7 @@ import type { AppDeps } from '../app.js';
 import type { Logger } from '../log.js';
 import type { OrchestratorAdapter } from '../orchestrator/types.js';
 import { gatewayErrorToResponse } from '../routes/errors.js';
-import { attentionFor, classifyTask, isAwaitingInput, needsApprovalCheck, needsDetail, needsPaneCheck } from './classify.js';
+import { attentionFor, classifyTask, inputState, needsApprovalCheck, needsDetail, needsPaneCheck } from './classify.js';
 import { GhPrService } from './pr.js';
 import type { ApprovalDetector, PrLookup } from './types.js';
 const gatewayError = (error: unknown) => error instanceof GatewayError ? error : new GatewayError('unknown');
@@ -53,15 +53,15 @@ export class StatusService {
      try { task = await this.deps.gateway.getTask(task.id); } catch { /* Keep summary on a detail failure. */ }
     }
     let approval: ApprovalPrompt | null = null;
-    let awaitingInput = false;
+    let input: ReturnType<typeof inputState> = null;
     if (needsPaneCheck(task, this.deps.detector)) {
      try {
       const pane = await this.deps.gateway.readPane(task.id, 200);
-      awaitingInput = isAwaitingInput(pane.text);
+      input = inputState(pane.text);
       approval = this.deps.detector!.detect(tailLines(pane.text).join('\n'), pane.capturedAt, task.agent);
      } catch { /* Detection and pane failure are not approval evidence. */ }
     }
-    const view = await this.toTaskView(task, approval, agtx.tuiConnected, false, awaitingInput);
+    const view = await this.toTaskView(task, approval, agtx.tuiConnected, false, input);
     results[index] = { view, item: attentionFor(task, view.displayState, approval, agtx.tuiConnected).item };
    }
   }));
@@ -70,8 +70,8 @@ export class StatusService {
   this.snapshot = structuredClone(result);
   return result;
  }
- private async toTaskView(task: TaskSummary | TaskDetail, approval: ApprovalPrompt | null, tuiConnected: boolean | null, wait: boolean, awaitingInput = false): Promise<TaskView> {
-  const displayState = classifyTask({ task, approval, agtxTuiConnected: tuiConnected, disconnected: false, awaitingInput });
+ private async toTaskView(task: TaskSummary | TaskDetail, approval: ApprovalPrompt | null, tuiConnected: boolean | null, wait: boolean, input: ReturnType<typeof inputState> = null): Promise<TaskView> {
+  const displayState = classifyTask({ task, approval, agtxTuiConnected: tuiConnected, disconnected: false, input });
   return { id: task.id, title: task.title, status: task.status, agent: task.agent, phaseStatus: task.phaseStatus,
    agentState: task.agentState ?? null, phaseAgeSecs: task.phaseAgeSecs, displayState,
    attentionReason: attentionFor(task, displayState, approval, tuiConnected).reason, depsSatisfied: task.depsSatisfied,
@@ -79,7 +79,9 @@ export class StatusService {
    cycle: task.cycle, branchName: task.branchName, pr: await this.deps.pr.lookup(task.prUrl ?? null, task.prNumber, { wait }), updatedAt: task.updatedAt };
  }
  async getTaskDetail(id: string): Promise<TaskDetailView> {
-  const tasks = await this.deps.gateway.listTasks();
+  const [tuiConnected, tasks] = await Promise.all([
+   this.deps.gateway.getHealth().then(health => health.tuiConnected, () => null), this.deps.gateway.listTasks()
+  ]);
   if (!tasks.some(task => task.id === id)) throw new GatewayError('not_found');
   const task = await this.deps.gateway.getTask(id);
   let pane: TaskDetailView['pane'] = null;
@@ -90,7 +92,7 @@ export class StatusService {
   if (pane && this.deps.detector && needsApprovalCheck(task)) {
    try { approval = this.deps.detector.detect(tailLines(pane.text).join('\n'), pane.capturedAt, task.agent); } catch { /* Leave approval null. */ }
   }
-  return { ...await this.toTaskView(task, approval, this.deps.gateway.lastHealth?.tuiConnected ?? null, true, !!pane && isAwaitingInput(pane.text)),
+  return { ...await this.toTaskView(task, approval, tuiConnected, true, pane ? inputState(pane.text) : null),
    description: task.description, worktreePath: task.worktreePath, sessionName: task.sessionName, baseBranch: task.baseBranch,
    referencedTasks: task.referencedTasks, blockedReason: task.blockedReason, escalationNote: task.escalationNote,
    pane, paneError, approval, testResult: { status: 'not_available', source: 'pane' } };
