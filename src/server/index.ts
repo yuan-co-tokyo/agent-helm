@@ -6,7 +6,7 @@ import type { HelmConfig } from './config.js';
 import { HttpAgtxGateway, checkAgtxVersion } from './agtx/http-gateway.js';
 import type { AgtxGateway } from './agtx/types.js';
 import type { OrchestratorAdapter } from './orchestrator/types.js';
-import { MockOrchestratorAdapter } from './orchestrator/mock-adapter.js';
+import { TmuxOrchestratorAdapter } from './orchestrator/tmux-adapter.js';
 import { createLogger } from './log.js';
 import { generateCsrfToken } from './security.js';
 export async function startServer(opts: { config?: HelmConfig; env?: NodeJS.ProcessEnv; gateway?: AgtxGateway; orchestrator?: OrchestratorAdapter } = {}) {
@@ -14,7 +14,7 @@ export async function startServer(opts: { config?: HelmConfig; env?: NodeJS.Proc
  assertLoopbackListen(config.listen.host);
  const logger = createLogger();
  const gateway = opts.gateway ?? new HttpAgtxGateway(config.agtx);
- const orchestrator = opts.orchestrator ?? new MockOrchestratorAdapter({ socket: config.orchestrator.tmuxSocket, session: config.orchestrator.session, window: config.orchestrator.window });
+ const orchestrator = opts.orchestrator ?? new TmuxOrchestratorAdapter({ socket: config.orchestrator.tmuxSocket, session: config.orchestrator.session, window: config.orchestrator.window },{ maxChars: config.limits.instructionMaxChars });
  try { checkAgtxVersion(await gateway.getHealth(),logger); } catch { logger.warn('agtx_health_unavailable'); }
  try { await gateway.resolveProject(); } catch { logger.warn('agtx_project_unavailable'); }
  const csrfToken = generateCsrfToken();

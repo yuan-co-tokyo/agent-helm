@@ -14,6 +14,6 @@ export function makeApp(staticRoot?: string, options: { statusService?: StatusSe
  const orchestrator = new MockOrchestratorAdapter();
  const statusService = options.statusService ?? new StatusService({ gateway, orchestrator, detector: options.approvalDetector, pr: { async lookup(url, number) { return { url, number, state: url || number !== null ? 'unknown' : 'none', fetchedAt: null }; } } });
  const app = createApp({ config: config(), gateway, orchestrator, statusService, approvalDetector: options.approvalDetector, csrfToken: 'test-csrf-secret', appVersion: '0.1.0', logger: createLogger(line => logs.push(line)), staticRoot });
- return { app, logs, gateway };
+ return { app, logs, gateway, orchestrator };
 }
 export const headers = { host: '127.0.0.1:8790', origin: 'http://127.0.0.1:8790', 'x-helm-csrf': 'test-csrf-secret', 'content-type': 'application/json' };
