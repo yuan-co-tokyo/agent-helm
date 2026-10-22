@@ -56,7 +56,7 @@ AGTX_CONTRACT=1 AGTX_BASE_URL=http://127.0.0.1:8799 pnpm test test/contract
 | AC-06 Orchestrator 自身の承認 | 達成 | 専用 Claude を対象に、Web の対象・キー確認→`2` 送信→実画面中断を確認。本番 Orchestrator には送信していない |
 | AC-07 stale・終了・二重クリック・不明 | 未検証 | ルート/UI テストと E2E は成功。実 agtx の不明応答・対象終了を伴う異常系は未検証 |
 | AC-08 停止・切断 | 達成 | T8 の serve 停止で到達不可を確認。前回の TUI 接続値を残す問題を修正し、不明表示を回帰テストで確認 |
-| AC-09 PR・テスト結果 | 未検証 | PR 分類・リンクのテスト成功、実 PR 状態遷移は未確認。テスト結果は仕様制限として未取得表示 |
+| AC-09 PR・テスト結果 | 未検証 | PR は agtx の pr_url、無ければ branch_name で gh pr list --head 補完（MERGED 優先→updatedAt 最新）。分類・リンク・ブランチ補完の自動テスト成功、実 PR 状態遷移は未確認。テスト結果は仕様制限として未取得表示 |
 | AC-10 PC/スマホ幅 | 達成 | Chromium 1280×800 / 390×844 で検証。外部公開禁止のため実スマートフォン端末は対象外 |
 | AC-11 注入・対象外防止 | 達成 | 実 tmux のリテラル文字列入力・完全一致対象、HTTP セキュリティ境界値、UI エスケープのテスト成功 |
 | AC-12 外部公開・既存環境破壊なし | 達成 | loopback のみ、main/PR マージなし、既存タスクへの入力なし。下記のプロジェクト登録副作用あり |
@@ -91,3 +91,11 @@ T6 で `agtx --help` が TUI を起動して検証ワークツリーを自動登
 - exited の Codex / Claude は空の入力欄のみ「入力待ち」。文字ありは `input_pending`（入力途中）で要対応に残す。ANSI 除去後は Codex プレースホルダーと入力文字を区別できないため、プレースホルダーもこの扱いとする。
 - `pnpm typecheck` / `pnpm lint` / `pnpm build` 成功。`pnpm test`: 38 ファイル・339 件成功、任意の実 agtx 契約テスト 1 件スキップ。`pnpm test:e2e`: desktop/mobile 計 8 件成功。
 - HTTP・専用 tmux・Chromium のテストはサンドボックス外で実行。実 agtx への送信は行っていない。
+
+### T10 自動検証（2026-10-23 JST）
+
+- PR の URL 優先・日本語ブランチ補完・MERGED 優先・更新日時順・0件・不正応答・失敗キャッシュ・TTL・同時照会集約を確認。
+- 完了／未着手は stale より優先、agtx 切断は最優先。依存・エスカレーションが残っても要対応に含めず、一覧でペインを照会しないことを確認。
+- 推定 ANSI フィクスチャと隔離 tmux の printf → capture-pane -e により dim／灰色の保持と入力待ち判定を確認。通常色の入力は入力途中、内部 inputText は詳細 API に含めない。
+- `pnpm typecheck`、`pnpm lint`、`pnpm build` 成功。`pnpm test`: 373 成功・実 agtx 契約テスト1件スキップ。`pnpm test:e2e`: desktop/mobile 計8件成功。
+- 実 agtx `/pane` の取得と実 GitHub PR の状態遷移は未検証。マージ後に Orchestrator が本番を読み取り専用で再確認予定。今回、実 agtx への送信・GitHub 書き込みは実施していない。

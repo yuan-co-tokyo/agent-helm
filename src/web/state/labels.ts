@@ -1,5 +1,7 @@
 import type { AttentionItem, DisplayState, PrDisplayState, TaskStatus } from '../../shared/api.js';
 export const DISPLAY_STATE_LABELS: Record<DisplayState, { label: string; tone: string; symbol: string }> = {
+ done: { label: '完了', tone: 'success', symbol: '✓' },
+ backlog: { label: '未着手', tone: 'muted', symbol: '○' },
  input_pending: { label: '入力途中（入力欄に文字あり）', tone: 'warning', symbol: '◇' },
  awaiting_input: { label: '入力待ち（完了確認待ち）', tone: 'info', symbol: '○' },
  disconnected: { label: '切断中', tone: 'muted', symbol: '▲' }, stale: { label: '状態不明（古い）', tone: 'muted', symbol: '▲' },

@@ -27,3 +27,8 @@ it('translates all known input reasons and provides a fallback',async()=> {
  expect(DISPLAY_STATE_LABELS.input_pending.label).toBe('入力途中（入力欄に文字あり）');
  expect(DISPLAY_STATE_LABELS.awaiting_input.label).toBe('入力待ち（完了確認待ち）');
 });
+
+it('labels completed and unstarted tasks', () => {
+ expect(DISPLAY_STATE_LABELS.done.label).toBe('完了');
+ expect(DISPLAY_STATE_LABELS.backlog.label).toBe('未着手');
+});

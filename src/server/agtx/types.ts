@@ -1,5 +1,6 @@
 import type { AgtxKey, PaneSnapshot, PhaseStatus, SendOutcome, TaskStatus } from '../../shared/api.js';
 export type { AgtxKey } from '../../shared/api.js';
+export type AgtxPane = PaneSnapshot & { inputText?: string | null };
 export interface AgtxHealth { version: string; mode: string | null; projectCount: number | null; tuiConnected: boolean | null; fetchedAt: string }
 export interface ProjectRef { id: string; name: string; path: string | null }
 export interface TaskSummary {
@@ -26,6 +27,6 @@ export interface AgtxGateway {
  resolveProject(): Promise<ProjectRef>;
  listTasks(): Promise<TaskSummary[]>;
  getTask(taskId: string): Promise<TaskDetail>;
- readPane(taskId: string, lines?: number): Promise<PaneSnapshot>;
+ readPane(taskId: string, lines?: number): Promise<AgtxPane>;
  sendKey(taskId: string, key: AgtxKey): Promise<KeySendResult>;
 }

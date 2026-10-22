@@ -18,6 +18,10 @@ describe('HTTP gateway',() => {
   expect(await gateway.readPane(TASK_ID,9999)).toMatchObject({ text: 'plain', lines: 2000 });
   expect(mock.requests.at(-1)?.path).toContain('?lines=2000');
  });
+ it('retains internal style evidence while stripping display ANSI', async () => {
+  mock.state.panes[TASK_ID] = { text: '› \x1b[90mplaceholder\x1b[0m' };
+  expect(await gateway.readPane(TASK_ID)).toMatchObject({ text:'› placeholder',inputText:'› ' });
+ });
  it('handles missing pane and malformed pane',async () => {
   delete mock.state.panes[TASK_ID];
   await expect(gateway.readPane(TASK_ID)).rejects.toMatchObject({ kind: 'not_found' });
