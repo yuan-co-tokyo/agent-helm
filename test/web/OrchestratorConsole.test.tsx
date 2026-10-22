@@ -54,3 +54,46 @@ test('unknown outcome preserves input and never retries',async()=> {
  await act(async()=>{}); await act(async()=> { await vi.advanceTimersByTimeAsync(30000); });
  expect(screen.getByText(/結果不明: 再送せず/)).toBeTruthy(); expect(input.value).toBe('keep me'); expect(apiPost).toHaveBeenCalledTimes(1);
 });
+const approvalPane:OrchestratorScreenResponse = {...pane,inputReady:{ok:false},approval:{agentKind:'claude',kind:'approval',question:'Original?',detail:null,capturedAt:pane.capturedAt,fingerprint:'original',options:[{key:'1',label:'Yes',meaning:'approve',shortcut:null,warn:false,sendable:true}]}};
+const optionButton = ()=>screen.getByRole('button',{name:'[1] Yes 承認'}) as HTMLButtonElement;
+async function approvalSetup() {
+ vi.useFakeTimers(); vi.mocked(apiGet).mockResolvedValue(approvalPane);
+ render(<OrchestratorConsole session={session} />); await act(async()=>{});
+}
+function confirmApproval() { fireEvent.click(optionButton()); fireEvent.click(screen.getByRole('button',{name:'送信'})); }
+test('shares one screen poll and freezes the selected fingerprint while polling',async()=> {
+ await approvalSetup(); expect(apiGet).toHaveBeenCalledTimes(1);
+ fireEvent.click(optionButton());
+ vi.mocked(apiGet).mockResolvedValue({...approvalPane,approval:{...approvalPane.approval!,question:'Changed?',fingerprint:'changed'}});
+ await act(async()=>{await vi.advanceTimersByTimeAsync(1500);}); expect(apiGet).toHaveBeenCalledTimes(2);
+ expect(screen.queryByText('Changed?')).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:'送信'})); await act(async()=>{});
+ expect(apiPost).toHaveBeenCalledWith('/api/approvals/respond',expect.objectContaining({fingerprint:'original'}));
+});
+test('holds unknown prompts through polls and failed verification',async()=> {
+ await approvalSetup(); vi.mocked(apiPost).mockRejectedValue(new HelmApiError(0,'network'));
+ confirmApproval(); await act(async()=>{});
+ vi.mocked(apiGet).mockResolvedValue({...approvalPane,approval:{...approvalPane.approval!,question:'Changed?',fingerprint:'changed'}});
+ await act(async()=>{await vi.advanceTimersByTimeAsync(1500);});
+ expect(optionButton().disabled).toBe(true); expect(screen.getByText('Original?')).toBeTruthy(); expect(screen.queryByText('Changed?')).toBeNull();
+ vi.mocked(apiGet).mockRejectedValueOnce(new HelmApiError(0,'network'));
+ fireEvent.click(screen.getByRole('button',{name:'最新を確認'})); await act(async()=>{});
+ expect(optionButton().disabled).toBe(true); expect(screen.getByText('Original?')).toBeTruthy();
+ fireEvent.click(screen.getByRole('button',{name:'最新を確認'})); await act(async()=>{});
+ expect(optionButton().disabled).toBe(false); expect(screen.getByText('Changed?')).toBeTruthy(); expect(apiPost).toHaveBeenCalledTimes(1);
+});
+test.each(['sent','stale'])('keeps actions blocked after %s until a later-started poll completes',async outcome=> {
+ await approvalSetup();
+ let finishSend!:(value:unknown)=>void, rejectSend!:(error:Error)=>void;
+ vi.mocked(apiPost).mockImplementation(()=>new Promise((resolve,reject)=>{finishSend=resolve;rejectSend=reject;}));
+ let finishOld!:(value:unknown)=>void, finishNew!:(value:unknown)=>void;
+ vi.mocked(apiGet).mockImplementationOnce(()=>new Promise(resolve=>{finishOld=resolve;})).mockImplementationOnce(()=>new Promise(resolve=>{finishNew=resolve;}));
+ confirmApproval();
+ await act(async()=>{await vi.advanceTimersByTimeAsync(1500);});
+ await act(async()=>{if (outcome==='stale') rejectSend(new HelmApiError(409,'stale')); else finishSend({outcome:'sent'});});
+ // Both success and stale rejection must wait for a request started after the result.
+ expect(optionButton().disabled).toBe(true);
+ await act(async()=>{finishOld(approvalPane);}); expect(optionButton().disabled).toBe(true);
+ await act(async()=>{await vi.advanceTimersByTimeAsync(1);});
+ await act(async()=>{finishNew(approvalPane);}); expect(optionButton().disabled).toBe(false);
+});

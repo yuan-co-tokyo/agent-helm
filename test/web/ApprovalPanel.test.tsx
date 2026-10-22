@@ -69,3 +69,15 @@ test('failed manual check without a prior send does not report an unknown send',
  expect(screen.queryByText(/結果不明/)).toBeNull();
  expect((screen.getByRole('button',{name:'[1] Yes 承認'}) as HTMLButtonElement).disabled).toBe(false);
 });
+
+test('shows terminal guidance without option buttons',async()=> {
+ vi.mocked(apiGet).mockResolvedValue({...pane,approval:{...pane.approval!,terminalOnly:true,options:[],detail:'Folder path'}});
+ await setup(); expect(screen.getByText('この確認は端末（agtx TUI）で操作してください')).toBeTruthy();
+ expect(screen.getByText('Folder path')).toBeTruthy(); expect(screen.queryAllByRole('button',{name:/^\[/})).toHaveLength(0);
+});
+test('formats capture times in the panel and confirmation',async()=> {
+ await setup(); const {formatTime} = await import('../../src/web/lib/send-state.js');
+ expect(screen.getByText('取得時刻: '+formatTime(pane.capturedAt))).toBeTruthy();
+ const dialog = openDialog(); expect(dialog.getByText('取得時刻: '+formatTime(pane.capturedAt))).toBeTruthy();
+ expect(screen.queryByText('取得時刻: '+pane.capturedAt)).toBeNull();
+});

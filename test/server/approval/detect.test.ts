@@ -72,5 +72,20 @@ it('detects real Claude 2.1.307 and Codex 0.156.1 permission screens', () => {
  expect(detect(fixture('codex-exec-approval.real'))).toMatchObject({ agentKind: 'codex', kind: 'approval' });
  expect(detect(fixture('codex-trust.real'))).toMatchObject({ agentKind: 'codex', kind: 'trust' });
  // Claude's new unnumbered trust selector has no stable single-key mapping.
- expect(detect(fixture('claude-trust.real'))).toBeNull();
+ expect(detect(fixture('claude-trust.real'))).toMatchObject({agentKind:'claude',kind:'trust',terminalOnly:true,options:[]});
+});
+
+it('recognizes terminal selectors without treating cursor movement as a new prompt',()=> {
+ const text = fixture('claude-trust.real'); const raw = detect(text)!;
+ expect(raw.question).toContain('trust'); expect(raw.fingerprint).toMatch(/^[a-f0-9]{64}$/);
+ expect(toApprovalPrompt(raw,'task').terminalOnly).toBe(true);
+ expect(detect(text.replace('❯ No','  No').replace('   Yes',' ❯ Yes'))?.fingerprint).toBe(raw.fingerprint);
+ expect(detect(text.replace('/path/to/','/another/'))?.fingerprint).not.toBe(raw.fingerprint);
+ for (const changed of [text.replace('Enter to confirm','Confirm'),text.replace('   Yes',' ❯ Yes'),text.replace('No, exit','1. No, exit')]) expect(detect(changed)).toBeNull();
+});
+it.each([12,13])('bounds command lookback at %s lines',distance=> {
+ const text = 'Bash command\n old cmd\n' + 'output\n'.repeat(distance-2) + 'Do you want to proceed?\n❯ 1. Yes\n  2. No\n';
+ const raw = detect(text)!;
+ expect(raw.detail?.includes('old cmd') ?? false).toBe(distance===12);
+ expect(detect(text.replace('old cmd','changed'))?.fingerprint===raw.fingerprint).toBe(distance!==12);
 });

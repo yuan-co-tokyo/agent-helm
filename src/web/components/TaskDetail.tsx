@@ -1,3 +1,4 @@
+import { isUuid, TERMINAL_ONLY_MESSAGE } from '../../shared/constants.js';
 import { useEffect, useRef, type ReactNode } from 'react';
 import type { ApprovalPrompt, ApprovalTarget, TaskDetailView, TaskView } from '../../shared/api.js';
 import { formatTime } from '../state/labels.js';
@@ -25,16 +26,18 @@ export function TaskDetail({ taskId, detail, summary, connected, lastSuccessAt, 
  return <dialog ref={dialog} className="task-drawer" aria-modal="true" aria-labelledby="detail-title" onCancel={event => { event.preventDefault(); onClose(); }}>
  <button className="close-detail" onClick={onClose} autoFocus>閉じる</button><h2 id="detail-title">{task?.title ?? 'タスク詳細'}</h2>
  {task && <StatusBadge state={task.displayState} />}
- {!connected && <p role="alert">{error ? `切断中・${lastSuccessAt ? `最終取得 ${formatTime(lastSuccessAt)}` : '未取得'} (${error.message})` : '取得中…'}</p>}
+ {!isUuid(taskId) && <p role="alert">不正なタスクIDです</p>}
+ {isUuid(taskId) && !connected && <p role="alert">{error ? `切断中・${lastSuccessAt ? `最終取得 ${formatTime(lastSuccessAt)}` : '未取得'} (${error.message})` : '取得中…'}</p>}
  <div className={!connected && detail ? 'is-stale' : ''}>
  {detail && <><h3>説明</h3><p className="pre-line">{detail.description ?? '説明なし'}</p>
  {(detail.blockedReason || detail.displayState === 'blocked') && <p>ブロック理由: {detail.blockedReason ?? '理由不明'}</p>}
  {detail.escalationNote && <p>エスカレーション: {detail.escalationNote}</p>}
  <h3>PR</h3><PrBadge pr={detail.pr} /><p>PR 最終取得: {detail.pr.fetchedAt ? formatTime(detail.pr.fetchedAt) : '未取得'}</p>
  <h3>テスト結果</h3><p>未取得（出典: ペイン）{detail.testResult.source && ` · ${detail.testResult.source}`}</p>
+ {detail.approval?.terminalOnly && <p className="helm-warning">{TERMINAL_ONLY_MESSAGE}</p>}
  <h3>ペイン</h3>{detail.paneError && <p role="alert">ペイン取得エラー: {detail.paneError.code} · {detail.paneError.message}</p>}
  {detail.pane ? <><small>取得: {formatTime(detail.pane.capturedAt)}</small><pre ref={pane} className="pane" aria-label="ペイン出力" tabIndex={0} onScroll={event => { const el = event.currentTarget; follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24; }}>{stripControl(detail.pane.text)}</pre></> : <p>ペイン未取得</p>}
  </>}
- </div><div className="approval-slot">{renderApproval ? renderApproval(target,detail?.approval ?? null) : <ApprovalPanel target={target}  />}</div>
+ </div><div className="approval-slot">{isUuid(taskId) && (renderApproval ? renderApproval(target,detail?.approval ?? null) : <ApprovalPanel target={target}  />)}</div>
  </dialog>;
 }

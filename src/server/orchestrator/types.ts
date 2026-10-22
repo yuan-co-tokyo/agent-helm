@@ -8,7 +8,7 @@ export interface OrchestratorAdapter {
  sendInstruction(text: string): Promise<Omit<SendResult,'requestId'>>;
  sendKey(key: OrchestratorKey): Promise<Omit<SendResult,'requestId'>>;
 }
-export type { ApprovalDetector } from '../tmux/input-ready.js';
+export type { ApprovalDetector } from '../status/types.js';
 export class OrchestratorError extends Error {
  constructor(public kind: 'not_found'|'ambiguous'|'tmux_error') { super(kind); }
 }

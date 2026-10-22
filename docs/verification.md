@@ -41,7 +41,7 @@ AGTX_CONTRACT=1 AGTX_BASE_URL=http://127.0.0.1:8799 pnpm test test/contract
 | AC-01 ローカル起動・接続 | 達成 | build 後の startServer を loopback 8794 で起動し、実 agtx 8799 接続・UI 表示を確認。通常起動コマンドは README に記載 |
 | AC-02 日本語・改行を既存 Orchestrator へ送信 | 未検証 | 専用実 tmux の prompt-app に E2E で送信・出力確認。既存本番 Orchestrator への送信は実施していない |
 | AC-03 状態更新・詳細 | 達成 | 実 7 タスクと T6 詳細を Chromium で確認、GET 契約テスト成功。exited/ended を完了扱いしない |
-| AC-04 Claude 許可・拒否 | 未検証 | Claude 2.1.307 の実画面表示と Web 拒否は成功。実 agtx タスクへの許可/拒否往復・許可後の実行は未確認。番号なし trust は非対応 |
+| AC-04 Claude 許可・拒否 | 未検証 | Claude 2.1.307 の実画面表示と Web 拒否は成功。実 agtx タスクへの許可/拒否往復・許可後の実行は未確認。番号なし trust は検出して端末操作を案内（Web からキー送信不可、実機表示は未確認） |
 | AC-05 Codex 許可・拒否 | 未検証 | 実行許可・trust 画面取得、端末 Escape による拒否まで確認。Web→実 agtx タスクへの入力は未確認 |
 | AC-06 Orchestrator 自身の承認 | 達成 | 専用 Claude を対象に、Web の対象・キー確認→`2` 送信→実画面中断を確認。本番 Orchestrator には送信していない |
 | AC-07 stale・終了・二重クリック・不明 | 未検証 | ルート/UI テストと E2E は成功。実 agtx の不明応答・対象終了を伴う異常系は未検証 |
@@ -58,7 +58,7 @@ AGTX_CONTRACT=1 AGTX_BASE_URL=http://127.0.0.1:8799 pnpm test test/contract
 `test/fixtures/panes/` に以下を保存。無関係な履歴・ローカルパスは除去/置換し、画面の選択肢・コマンドは保持した。
 
 - `claude-bash-approval.real.txt`: manual モード、検証セッションだけ `permissions.ask=["Bash(*)"]`、コマンド `ls`。2 選択肢（Yes/No）。コマンドは質問より上にある。指紋にこのブロックを含める回帰テストを追加。
-- `claude-trust.real.txt`: 番号なし「No, exit / Yes, I trust this folder」。安定した単一キー対応がないため検出器は null、端末での操作が必要。
+- `claude-trust.real.txt`: 番号なし「No, exit / Yes, I trust this folder」。検出して要対応と端末操作の案内を表示する。Web からのキー送信は拒否する。
 - `codex-exec-approval.real.txt`: `Environment: local`、Reason、`$ ls`、1/2/3 と y/p/esc。
 - `codex-trust.real.txt`: `Folder access`、`Trust this folder?`、1 Trust and continue / 2 Quit。
 

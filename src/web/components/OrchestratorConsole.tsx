@@ -35,7 +35,7 @@ export function OrchestratorConsole({session,status,maxChars=DEFAULT_INSTRUCTION
   <pre ref={screenRef} onScroll={onScroll}>{screen.data?.text ?? '画面を取得中…'}</pre>
   {!pinned && <button onClick={jump}>最新へ ↓</button>}
   {/* Keep the panel mounted so parent polling cannot discard a confirmation or unknown outcome. */}
-  <ApprovalPanel target={{kind:'orchestrator'}} projectName={session?.target.project.name} />
+  <ApprovalPanel screen={screen} target={{kind:'orchestrator'}} projectName={session?.target.project.name} />
   <div className="console-input"><label>指示<textarea value={text} disabled={state.kind==='sending'} onChange={event=>setText(event.target.value)} onKeyDown={event=> { if ((event.ctrlKey || event.metaKey) && event.key==='Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); void send(); } }} /></label>
   <p className={countChars(text)>maxChars ? 'helm-warning' : ''}>{countChars(text)} / {maxChars}{countChars(text)>maxChars && ' 上限を超えています（切り詰めません）'}</p>
   {!screen.data?.inputReady.ok && <p>{screen.data?.inputReady.reason ?? '画面を取得するまで送信できません'}</p>}

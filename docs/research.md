@@ -96,7 +96,7 @@
 
 - Claude 2.1.307: `Bash command`、説明、`ls`、権限ルール説明の後に `Do you want to proceed?` と **1 Yes / 2 No**。既存の推定 3 選択肢とは異なる。質問より上のコマンドも指紋へ含める修正を行った。Web から 2 を送り、`Interrupted · What should Claude do instead?` を確認。
 - Claude の通常 manual モードでも `ls` は確認なしで実行された。検証セッションの `permissions.ask=["Bash(*)"]` を追加すると確認画面が出た。グローバルの権限ルールは変更していない。
-- Claude trust: 番号なしの `No, exit` / `Yes, I trust this folder`（初期選択は拒否）。従来の numbered detector は対応しない。Web から推測キーを送らず端末で確認する。
+- Claude trust: 番号なしの `No, exit` / `Yes, I trust this folder`（初期選択は拒否）。selector detector で検出して要対応に表示する実装を追加。Web からキーを送らず、端末操作の案内を表示する。
 - Codex 0.156.1: `Would you like to run the following command?`、`Environment: local`、`Reason: ...`、`$ ls`、**1 Yes, proceed (y) / 2 Yes, and don't ask again ... (p) / 3 No, and tell Codex ... (esc)**。実画面を取得し Escape で拒否。
 - Codex trust: `Folder access`、`Trust this folder?` の説明、1 Trust and continue / 2 Quit。実フィクスチャを保存。
 - `Approaching rate limits / Switch to …?` はモデル切替メニューで、実行許可ではない。回帰テストで承認検出 null、入力拒否 `menu_open` を確認（この文面のフィクスチャは合成、今回実機でレート制限は発生させていない）。

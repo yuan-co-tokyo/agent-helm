@@ -1,7 +1,4 @@
-import { createHash } from 'node:crypto';
 import type { ApprovalPrompt, InputReady } from '../../shared/api.js';
-import type { ApprovalDetector } from '../status/types.js';
-export type { ApprovalDetector } from '../status/types.js';
 const approvalPattern = /Do you want to|Would you like to|Allow .*\?|\[y\/n\]|\(yes\/no\)/i;
 const promptPattern = /^\s*[│ ]*[❯›]/;
 const numbered = /^\s*\d+\.\s/;
@@ -14,13 +11,6 @@ function activeLines(text: string) {
  while (start > 0 && !/^[\s─━═╭╮╰╯│┌┐└┘-]*$/.test(lines[start - 1]!)) start--;
  return { lines: lines.slice(start), index: index - start };
 }
-export const simpleApprovalDetector: ApprovalDetector = {
- detect(text,capturedAt) {
-  const { lines } = activeLines(text);
-  const question = lines.find(line => approvalPattern.test(line));
-  return question ? { agentKind: 'generic', kind: 'approval', detail: '', question: question.trim(), options: [], fingerprint: createHash('sha256').update(lines.join('\n')).digest('hex'), capturedAt } : null;
- }
-};
 export function assessInputReady(text: string, { approval }: { approval: ApprovalPrompt | null }): InputReady {
  const { lines, index } = activeLines(text);
  const reject = (reason: string): InputReady => ({ ok: false, reason });

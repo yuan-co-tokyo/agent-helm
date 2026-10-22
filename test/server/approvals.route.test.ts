@@ -100,3 +100,13 @@ function deferred<T>() {
  const promise = new Promise<T>(done => { resolve = done; });
  return { promise, resolve };
 }
+
+it.each(['task','orchestrator'] as const)('never sends terminal selector keys to %s',async kind=> {
+ const ctx = setup(kind,readFileSync('test/fixtures/panes/claude-trust.real.txt','utf8'));
+ for (const key of ['1','Enter','Down']) {
+  const response = await ctx.post({...ctx.body,key,requestId:randomUUID()});
+  expect(response.status).toBe(400); expect(await response.json()).toMatchObject({error:{code:'key_not_sendable'}});
+ }
+ expect((await ctx.post({...ctx.body,fingerprint:'0'.repeat(64),requestId:randomUUID()})).status).toBe(409);
+ expect(ctx.gateway.sentKeys).toHaveLength(0); expect(ctx.orchestrator.keys).toHaveLength(0);
+});
