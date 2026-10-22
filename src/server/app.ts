@@ -18,6 +18,7 @@ import { apiError } from './routes/errors.js';
 import type { StatusService, ApprovalDetector } from './status/index.js';
 export interface AppDeps {
  statusService?: StatusService; approvalDetector?: ApprovalDetector | null;
+ approval?: { settleMs?: number; sendTimeoutMs?: number; sleep?: (ms: number) => Promise<void> };
  config: HelmConfig; gateway: AgtxGateway; orchestrator: OrchestratorAdapter;
  csrfToken: string; appVersion: string; staticRoot?: string | null; logger: Logger;
 }

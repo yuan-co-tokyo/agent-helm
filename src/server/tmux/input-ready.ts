@@ -17,7 +17,7 @@ export const simpleApprovalDetector: ApprovalDetector = {
  detect(text,capturedAt) {
   const { lines } = activeLines(text);
   const question = lines.find(line => approvalPattern.test(line));
-  return question ? { agentKind: 'generic', question: question.trim(), options: [], fingerprint: createHash('sha256').update(lines.join('\n')).digest('hex'), capturedAt } : null;
+  return question ? { agentKind: 'generic', kind: 'approval', detail: '', question: question.trim(), options: [], fingerprint: createHash('sha256').update(lines.join('\n')).digest('hex'), capturedAt } : null;
  }
 };
 export function assessInputReady(text: string, { approval }: { approval: ApprovalPrompt | null }): InputReady {

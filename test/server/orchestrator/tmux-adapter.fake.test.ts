@@ -54,7 +54,7 @@ it('enforces keys and injected approval detector',async () => {
  const { adapter,calls,runner } = setup();
  for (const key of ['C-c','x','Enter; kill']) expect(await adapter.sendKey(key as OrchestratorKey)).toMatchObject({ reason: 'key_not_allowed' });
  expect(calls).toHaveLength(0); await adapter.sendKey('Escape'); expect(calls[1]!.args).toEqual(['send-keys','-t','%1','Escape']);
- const blocked = new TmuxOrchestratorAdapter(target,{ runner, detector: { detect: (_text,capturedAt) => ({ agentKind: 'codex', question: 'custom', options: [], fingerprint: 'x', capturedAt }) } });
+ const blocked = new TmuxOrchestratorAdapter(target,{ runner, detector: { detect: (_text,capturedAt) => ({ agentKind: 'codex', kind: 'approval', detail: '', question: 'custom', options: [], fingerprint: 'x', capturedAt }) } });
  expect((await blocked.inspectScreen()).inputReady.reason).toBe('approval_pending');
  expect(await blocked.sendInstruction('hello')).toMatchObject({ reason: 'approval_pending' });
 });
