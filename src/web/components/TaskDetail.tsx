@@ -1,6 +1,6 @@
-import { isUuid, TERMINAL_ONLY_MESSAGE } from '../../shared/constants.js';
 import { useEffect, useRef, type ReactNode } from 'react';
 import type { ApprovalPrompt, ApprovalTarget, TaskDetailView, TaskView } from '../../shared/api.js';
+import { isUuid, TERMINAL_ONLY_MESSAGE } from '../../shared/constants.js';
 import { formatTime } from '../state/labels.js';
 import { stripControl } from '../text.js';
 import { ApprovalPanel } from './ApprovalPanel.js';

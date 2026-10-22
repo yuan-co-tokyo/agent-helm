@@ -60,12 +60,13 @@ function TargetPanel({target,projectName,screen}:ApprovalPanelProps & {target:Ap
   if (result.kind==='unknown' || result.kind==='gone') setHeld(selection.view);
   setVerified(null); setState(result); setSelection(null); inFlight.current = false;
  }
+ const capturedAt = view?.approval?.capturedAt ?? view?.pane?.capturedAt;
  const disabled = (blockedSeq!==null && polling.seq<=blockedSeq) || !!selection || checking || polling.stale || state.kind==='unknown' || state.kind==='sending';
  return <section className="helm-approval" aria-label="承認"><h2>承認</h2>
   <p>対象: {projectName} / {view?.title ?? (kind==='task' ? taskId : 'Orchestrator')} / {view?.agent}</p>
   {polling.stale && <p>切断中・古い画面・最終取得 {polling.lastSuccessAt ? formatTime(polling.lastSuccessAt) : '未取得'}</p>}
   <p role="status" aria-live="polite">{gone ? '対象は終了しています' : sendMessage(state,true)}</p>
-  {!gone && <><p>取得時刻: {view?.approval?.capturedAt || view?.pane?.capturedAt ? formatTime(view.approval?.capturedAt ?? view.pane!.capturedAt) : '未取得'}</p>
+  {!gone && <><p>取得時刻: {capturedAt ? formatTime(capturedAt) : '未取得'}</p>
    <p>{view ? view.approval?.question ?? '承認待ちは検出されていません' : '取得中…'}</p>
    {view?.approval?.terminalOnly && <><p className="helm-warning">{TERMINAL_ONLY_MESSAGE}</p><p>{view.approval.detail}</p></>}
    <pre>{excerpt(view?.pane ?? null)}</pre>
