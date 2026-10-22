@@ -22,3 +22,10 @@ it('handles resets and leaves normal foreground and background colors intact', a
  for (const color of ['31','38;5;120','38;2;128;0;128','48;5;245','48;2;128;128;128']) expect(stripFaint(`› \x1b[${color}mtyped`)).toBe('› typed');
  expect(stripFaint('\x1b[2m› ghost')).toBe('›');
 });
+it('drops an inverse cursor cell only when it starts faint placeholder text', async () => {
+ const { stripFaint } = await import('../../src/server/text.js');
+ expect(stripFaint('❯ \x1b[7mT\x1b[27m\x1b[90mry "fix lint errors"\x1b[39m')).toBe('❯ ');
+ expect(stripFaint('❯ \x1b[7mT\x1b[0m\x1b[2mry\x1b[0m')).toBe('❯ ');
+ expect(stripFaint('❯ typed\x1b[7m \x1b[27m')).toBe('❯ typed ');
+ expect(stripFaint('❯ \x1b[7ma\x1b[27mb')).toBe('❯ ab');
+});

@@ -21,3 +21,5 @@ Claude の番号なし trust 実画面は terminalOnly として検出し、要�
 Codex の `Explain this codebase` は既存 `codex-idle-input.txt` の文言を再利用しました。
 隔離 tmux テストは printf で SGR 2 / 90 / 38;5;245 を描画し、capture-pane -e が
 装飾を保持することと入力待ち判定を確認します。既存セッションは操作しません。
+Claude 系 TUI がプレースホルダー先頭文字にカーソルを反転表示（SGR 7）で描く場合に備え、
+反転セル直後が dim/灰色のときのみ反転セルをカーソルとして除去します（`test/server/text.test.ts`）。

@@ -9,14 +9,24 @@ export function stripFaint(raw: string): string | null {
  const sgr = /\x1b\[([0-9;]*)m/g;
  if (!sgr.test(raw)) return null;
  sgr.lastIndex = 0;
- let dim = false; let gray = false; let offset = 0; let result = '';
- const append = (text: string) => { result += dim || gray ? text.replace(/[^\n❯›]/g, '') : text; };
+ let dim = false; let gray = false; let inverse = false; let offset = 0; let result = ''; let cursor = '';
+ // An inverse-video cell directly before faint text is the rendered cursor on a placeholder's first character.
+ const append = (text: string) => {
+  if (!text) return;
+  const faint = dim || gray;
+  if (inverse && !faint && !text.includes('\n')) { cursor += text; return; }
+  if (!faint) result += cursor;
+  cursor = '';
+  result += faint ? text.replace(/[^\n❯›]/g, '') : text;
+ };
  for (const match of raw.matchAll(sgr)) {
   append(raw.slice(offset, match.index));
   const codes = match[1]!.split(';').map(Number);
   for (let i = 0; i < codes.length; i++) {
    const code = codes[i];
-   if (code === 0) { dim = false; gray = false; }
+   if (code === 0) { dim = false; gray = false; inverse = false; }
+   else if (code === 7) inverse = true;
+   else if (code === 27) inverse = false;
    else if (code === 2) dim = true;
    else if (code === 22) dim = false;
    else if (code === 39) gray = false;
@@ -33,7 +43,7 @@ export function stripFaint(raw: string): string | null {
   }
   offset = match.index + match[0].length;
  }
- append(raw.slice(offset));
+ append(raw.slice(offset)); result += cursor;
  const original = stripAnsi(raw).split('\n');
  const filtered = stripAnsi(result).split('\n');
  return original.map((line, i) => /^\s*[│ ]*[❯›]/.test(line) ? filtered[i] ?? '' : line).join('\n');
