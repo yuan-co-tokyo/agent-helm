@@ -35,6 +35,6 @@ export function TaskDetail({ taskId, detail, summary, connected, lastSuccessAt, 
  <h3>ペイン</h3>{detail.paneError && <p role="alert">ペイン取得エラー: {detail.paneError.code} · {detail.paneError.message}</p>}
  {detail.pane ? <><small>取得: {formatTime(detail.pane.capturedAt)}</small><pre ref={pane} className="pane" aria-label="ペイン出力" tabIndex={0} onScroll={event => { const el = event.currentTarget; follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24; }}>{stripControl(detail.pane.text)}</pre></> : <p>ペイン未取得</p>}
  </>}
- </div><div className="approval-slot">{renderApproval ? renderApproval(target,detail?.approval ?? null) : <ApprovalPanel target={target} prompt={detail?.approval ?? null} />}</div>
+ </div><div className="approval-slot">{renderApproval ? renderApproval(target,detail?.approval ?? null) : <ApprovalPanel target={target}  />}</div>
  </dialog>;
 }

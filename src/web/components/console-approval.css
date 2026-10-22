@@ -1,0 +1,15 @@
+.helm-console, .helm-approval { min-width: 0; padding: 1rem; border: 1px solid #718096; border-radius: .5rem; }
+.helm-console pre, .helm-approval pre { max-height: 50vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: #111827; color: #f3f4f6; padding: 1rem; }
+.helm-console button, .helm-approval button { min-height: 44px; min-width: 44px; padding: .6rem 1rem; cursor: pointer; }
+.helm-console button:disabled, .helm-approval button:disabled { cursor: default; opacity: .55; }
+.console-input { position: sticky; bottom: 0; background: #fff; color: #111827; padding: .75rem; }
+.console-input textarea { display: block; box-sizing: border-box; width: 100%; min-height: 6rem; font: inherit; }
+.helm-warning { color: #991b1b; background: #fff1e6; }
+.approval-options { display: flex; flex-wrap: wrap; gap: 1.5rem; margin-block: 1rem; }
+.approval-group { display: flex; flex-wrap: wrap; gap: .5rem; }
+.approval-group:empty { display: none; }
+.approval-badge { display: inline-block; margin-left: .5rem; font-weight: bold; }
+.approval-overlay { position: fixed; inset: 0; z-index: 100; background: #0009; display: grid; place-items: center; padding: 1rem; }
+.approval-dialog { box-sizing: border-box; width: min(100%, 44rem); max-height: 90vh; overflow: auto; background: white; color: #111827; padding: 1.5rem; border-radius: .5rem; }
+.approval-dialog button { margin: .5rem; }
+@media (max-width: 767px) { .approval-options, .approval-group { flex-direction: column; width: 100%; } .approval-options button { width: 100%; } }
