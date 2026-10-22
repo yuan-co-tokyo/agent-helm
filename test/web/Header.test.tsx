@@ -16,3 +16,7 @@ describe('Header', () => {
   expect(screen.getByText(/切断中・最終取得/)).toBeTruthy();
  });
 });
+it('shows an unknown TUI when agtx health is unavailable',()=> {
+ render(<Header session={session} state={{...state,agtx:{...state.agtx,tuiConnected:null}}} connected={false} lastSuccessAt={null} />);
+ expect(screen.getByText(/TUI: 不明/)).toBeTruthy();
+});

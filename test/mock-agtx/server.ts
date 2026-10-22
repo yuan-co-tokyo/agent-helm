@@ -43,7 +43,7 @@ export async function startMockAgtx(opts: { port?: number } = {}) {
   if (!task) return reply(404,{ error: 'task not found' });
   if (method === 'GET' && !action) return reply(200,task);
   if (method === 'GET' && action === 'pane') return id && id in state.panes ? reply(200,state.panes[id]) : reply(404,{ error: 'no session' });
-  if (method === 'POST' && action === 'input') return reply(task.status === 'done' ? 409 : 200,{ ok: task.status !== 'done' });
+  if (method === 'POST' && action === 'input') return reply(task.status === 'done' ? 409 : 200,{ delivered: task.status !== 'done' });
   return reply(405,{ error: 'unsupported' });
  });
  await new Promise<void>((resolve,reject) => { server.once('error',reject); server.listen(opts.port ?? 0,'127.0.0.1',resolve); });

@@ -43,12 +43,38 @@ export function registerApprovalRoutes(app: Hono, deps: AppDeps) {
   const option = prompt.options.find(item => item.key === request.key);
   if (!option) return error(400,'bad_request','Key is not an approval option');
   if (!option.sendable) return { status: 400, body: { error: { code: 'key_not_sendable', message: 'This option cannot be sent from the Web' }, option: { key: option.key, label: option.label } } };
-  const sent = await sendWithTimeout(() => target.kind === 'task' ? deps.gateway.sendKey(target.taskId,request.key as AgtxKey) : deps.orchestrator.sendKey(request.key as OrchestratorKey),deps.approval?.sendTimeoutMs ?? 5000);
+  const sendOne = (key: string) => sendWithTimeout(() => target.kind === 'task' ? deps.gateway.sendKey(target.taskId,key as AgtxKey) : deps.orchestrator.sendKey(key as OrchestratorKey),deps.approval?.sendTimeoutMs ?? 5000);
+  const settle = () => (deps.approval?.sleep ?? sleep)(deps.approval?.settleMs ?? 1000);
+  const sent = await sendOne(request.key);
   const result: SendResult = { requestId, outcome: sent.outcome, ...(sent.reason !== undefined ? { reason: sent.reason } : {}) };
-  if (result.outcome !== 'rejected') {
-   try { await (deps.approval?.sleep ?? sleep)(deps.approval?.settleMs ?? 1000); result.after = await read(); } catch { /* A failed refresh does not change the send outcome. */ }
+  let steps = 'key';
+  if (prompt.confirm === 'enter' && result.outcome === 'sent') {
+   try {
+    await settle();
+    result.after = await read();
+    const selected = detectApproval(result.after.text,{ capturedAt: result.after.capturedAt, agentHint });
+    if (!selected || selected.fingerprint !== prompt.fingerprint) {
+     result.outcome = 'unknown'; result.reason = 'prompt_changed';
+    } else if (selected.selected !== request.key) {
+     result.outcome = 'unknown'; result.reason = 'selection_unverified';
+    } else {
+     steps = 'key+enter';
+     const confirmed = await sendOne('Enter');
+     result.outcome = confirmed.outcome;
+     if (confirmed.reason !== undefined) result.reason = confirmed.reason;
+    }
+   } catch { result.outcome = 'unknown'; result.reason = 'selection_unverified'; }
   }
-  deps.logger.info('approval_send',{ target: target.kind, outcome: result.outcome });
+  if (result.outcome === 'sent' || (prompt.confirm !== 'enter' && result.outcome === 'unknown')) {
+   try {
+    await settle(); result.after = await read();
+    if (result.outcome === 'sent') {
+     const after = detectApproval(result.after.text,{ capturedAt: result.after.capturedAt, agentHint });
+     if (after?.fingerprint === prompt.fingerprint) result.outcome = 'sent_unconfirmed';
+    }
+   } catch { if (result.outcome === 'sent') result.reason = 'unverified'; }
+  }
+  deps.logger.info('approval_send',{ outcome: result.outcome, steps });
   return { status: 200, body: result };
  }
  app.post('/api/approvals/respond',async c => {

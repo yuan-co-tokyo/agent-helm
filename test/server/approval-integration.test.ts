@@ -19,6 +19,6 @@ it.each(['exited', null] as const)('detects real Claude approval with phase %s a
  expect(gateway.sentKeys).toEqual([]);
  gateway.setPane(current.id, text);
  body.requestId = randomUUID();
- expect(await (await post()).json()).toMatchObject({ outcome: 'sent' });
+ expect(await (await post()).json()).toMatchObject({ outcome: 'sent_unconfirmed' });
  expect(gateway.sentKeys).toEqual([{ taskId: current.id, key: '2' }]);
 });

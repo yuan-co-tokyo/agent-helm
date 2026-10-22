@@ -11,6 +11,7 @@ export class MockAgtxGateway implements AgtxGateway {
  project: ProjectRef = { id: '11111111-1111-4111-8111-111111111111', name: 'agent-helm', path: null };
  tasks: TaskDetail[] = [];
  panes = new Map<string,string>();
+ onKey?: (taskId: string, key: AgtxKey) => void;
  sentKeys: { taskId: string; key: AgtxKey }[] = [];
  private failures = new Map<Method,GatewayError>();
  setHealth(health: AgtxHealth) { this.health = health; }
@@ -41,6 +42,7 @@ export class MockAgtxGateway implements AgtxGateway {
    const task = await this.getTask(id);
    if (task.status === 'done') return { outcome: 'rejected', reason: 'conflict' };
    this.sentKeys.push({ taskId: id, key });
+   this.onKey?.(id,key);
    return { outcome: 'sent' };
   } catch (e) {
    const err = e instanceof GatewayError ? e : new GatewayError('unknown');

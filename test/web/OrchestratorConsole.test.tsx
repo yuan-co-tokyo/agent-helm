@@ -25,9 +25,9 @@ test('shows destination and prevents over-limit input without truncation',async(
  expect(apiPost).not.toHaveBeenCalled();
 });
 test('input readiness blocks sending',async()=> {
- vi.mocked(apiGet).mockResolvedValue({...pane,inputReady:{ok:false,reason:'処理中です'}});
+ vi.mocked(apiGet).mockResolvedValue({...pane,inputReady:{ok:false,reason:'busy'}});
  const input = await setup(); fireEvent.change(input,{target:{value:'hello'}});
- expect(screen.getByText('処理中です')).toBeTruthy();
+ expect(screen.getByText(/送信処理中です/ )).toBeTruthy();
  expect((screen.getByRole('button',{name:'指示を送信'}) as HTMLButtonElement).disabled).toBe(true);
 });
 test('guards duplicate submission and ignores IME',async()=> {
@@ -54,7 +54,7 @@ test('unknown outcome preserves input and never retries',async()=> {
  await act(async()=>{}); await act(async()=> { await vi.advanceTimersByTimeAsync(30000); });
  expect(screen.getByText(/結果不明: 再送せず/)).toBeTruthy(); expect(input.value).toBe('keep me'); expect(apiPost).toHaveBeenCalledTimes(1);
 });
-const approvalPane:OrchestratorScreenResponse = {...pane,inputReady:{ok:false},approval:{agentKind:'claude',kind:'approval',question:'Original?',detail:null,capturedAt:pane.capturedAt,fingerprint:'original',options:[{key:'1',label:'Yes',meaning:'approve',shortcut:null,warn:false,sendable:true}]}};
+const approvalPane:OrchestratorScreenResponse = {...pane,inputReady:{ok:false},approval:{confirm:'key',agentKind:'claude',kind:'approval',question:'Original?',detail:null,capturedAt:pane.capturedAt,fingerprint:'original',options:[{key:'1',label:'Yes',meaning:'approve',shortcut:null,warn:false,sendable:true}]}};
 const optionButton = ()=>screen.getByRole('button',{name:'[1] Yes 承認'}) as HTMLButtonElement;
 async function approvalSetup() {
  vi.useFakeTimers(); vi.mocked(apiGet).mockResolvedValue(approvalPane);
@@ -96,4 +96,10 @@ test.each(['sent','stale'])('keeps actions blocked after %s until a later-starte
  await act(async()=>{finishOld(approvalPane);}); expect(optionButton().disabled).toBe(true);
  await act(async()=>{await vi.advanceTimersByTimeAsync(1);});
  await act(async()=>{finishNew(approvalPane);}); expect(optionButton().disabled).toBe(false);
+});
+test.each(['input_not_empty','approval_pending','menu_open','prompt_not_found','completion_open'])('explains %s in Japanese',async reason=> {
+ vi.mocked(apiGet).mockResolvedValue({...pane,inputReady:{ok:false,reason}});
+ await setup();
+ expect(screen.getByText(/送信できない理由:/).textContent).not.toContain(reason);
+ expect((screen.getByRole('button',{name:'指示を送信'}) as HTMLButtonElement).disabled).toBe(true);
 });

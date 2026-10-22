@@ -25,7 +25,7 @@ export function detectSelector(lines: string[], capturedAt: string, agentKind: A
   }
   const detail = [...clean.slice(regionStart,first),...clean.slice(last + 1,start)].filter(Boolean)
    .concat('選択肢: ' + options.map(line => line.replace(/^❯\s*/,'')).join(' / ')).join('\n');
-  return { agentKind, kind: /trust/i.test(question + detail) ? 'trust' : 'approval', question, detail,
+  return { confirm: 'key', selected: null, agentKind, kind: /trust/i.test(question + detail) ? 'trust' : 'approval', question, detail,
    options: [], terminalOnly: true, fingerprint: fingerprint(lines.slice(regionStart,end + 1)), capturedAt, end };
  }
  return null;

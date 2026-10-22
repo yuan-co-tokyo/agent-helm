@@ -51,6 +51,19 @@ describe('HTTP gateway',() => {
   expect(await gateway.sendKey(TASK_ID,'y')).toEqual({ outcome: 'unknown', reason: 'bad_response' });
   expect(mock.requests.filter(r => r.method === 'POST')).toHaveLength(1);
  });
+ it.each([
+  [{delivered:true,extra:1},'sent'], [{delivered:false},'rejected'],
+  [{ok:true},'unknown'], [{},'unknown'], [{delivered:'true'},'unknown']
+ ])('interprets delivery response %j once',async (body,outcome)=> {
+  mock.state.overrides['POST ' + taskPath + '/input'] = {body};
+  expect(await gateway.sendKey(TASK_ID,'1')).toEqual(outcome==='sent' ? {outcome} : {outcome,reason:outcome==='rejected' ? 'not_delivered' : 'bad_response'});
+  expect(mock.requests.filter(r=>r.method==='POST')).toHaveLength(1);
+ });
+ it('treats an empty success body as unknown',async ()=> {
+  mock.state.overrides['POST ' + taskPath + '/input'] = {raw:''};
+  expect(await gateway.sendKey(TASK_ID,'1')).toEqual({outcome:'unknown',reason:'bad_response'});
+  expect(mock.requests.filter(r=>r.method==='POST')).toHaveLength(1);
+ });
  it('never calls HTTP for invalid keys or IDs',async () => {
   for (const key of ['C-c','a','x']) expect(await gateway.sendKey(TASK_ID,key as AgtxKey)).toMatchObject({ outcome: 'rejected' });
   await expect(gateway.getTask('../')).rejects.toMatchObject({ kind: 'not_found' });

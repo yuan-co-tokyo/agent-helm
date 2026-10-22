@@ -1,6 +1,7 @@
+import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 import type { TaskDetail } from '../../../src/server/agtx/types.js';
-import { attentionFor, classifyTask, needsDetail, needsPaneCheck } from '../../../src/server/status/classify.js';
+import { attentionFor, classifyTask, isAwaitingInput, needsDetail, needsPaneCheck } from '../../../src/server/status/classify.js';
 import { task, prompt } from './fixtures.js';
 it.each<[Partial<TaskDetail>, string]>([
  [{ phaseAgeSecs: 30 },'running'], [{ phaseAgeSecs: 31 },'stale'], [{ tuiConnected: false },'stale'],
@@ -41,4 +42,21 @@ it('limits detail and pane work', () => {
 
 it('explains terminal-only approval attention',()=> {
  expect(attentionFor(task(),'approval',{...prompt,terminalOnly:true}).item).toMatchObject({kind:'approval',reason:expect.stringContaining('この確認は端末（agtx TUI）で操作してください')});
+});
+
+it.each(['codex','claude',null])('only treats known exited agents as awaiting input: %s',agent=> {
+ const current = task({agent,phaseStatus:'exited'});
+ const input = {task:current,approval:null,agtxTuiConnected:true,disconnected:false,awaitingInput:true};
+ expect(classifyTask(input)).toBe(agent ? 'awaiting_input' : 'error');
+ expect(classifyTask({...input,approval:prompt})).toBe('approval');
+ expect(attentionFor(current,'awaiting_input',null)).toEqual({reason:'入力待ち（agtx は exited と報告）',item:null});
+});
+
+it.each([
+ ['codex-idle-input',true], ['shell-prompt',false], ['codex-exec-approval.real',false], ['codex-trust.real',false]
+])('recognizes input readiness from %s', (name,expected)=> {
+ expect(isAwaitingInput(readFileSync(`test/fixtures/panes/${name}.txt`,'utf8'))).toBe(expected);
+});
+it('excludes menus and completions from input waiting',()=> {
+ for (const text of ['❯ 1. One\n  2. Two','❯ \n /help']) expect(isAwaitingInput(text)).toBe(false);
 });

@@ -1,10 +1,10 @@
 export const TASK_STATUSES = ['backlog','planning','running','review','done'] as const;
 export const PHASE_STATUSES = ['working','blocked','idle','ready','exited'] as const;
-export const DISPLAY_STATES = ['disconnected','stale','approval','blocked','error','reviewing','phase_done','running','idle','unknown'] as const;
+export const DISPLAY_STATES = ['disconnected','stale','approval','blocked','error','reviewing','phase_done','awaiting_input','running','idle','unknown'] as const;
 export const AGTX_KEYS = ['y','n','1','2','3','Enter','Escape','Up','Down'] as const;
 export const ORCHESTRATOR_KEYS = ['y','n','a','1','2','3','4','Enter','Escape','Up','Down'] as const;
 export const PR_DISPLAY_STATES = ['none','open_review_pending','approved_waiting_merge','merged','closed','unknown'] as const;
-export const SEND_OUTCOMES = ['sent','rejected','unknown'] as const;
+export const SEND_OUTCOMES = ['sent','sent_unconfirmed','rejected','unknown'] as const;
 export const APPROVAL_MEANINGS = ['approve','approve_always','deny','unknown'] as const;
 export const APPROVAL_KINDS = ['approval','trust'] as const;
 export type ApprovalKind = typeof APPROVAL_KINDS[number];
@@ -23,7 +23,7 @@ export type ApiErrorCode = typeof API_ERROR_CODES[number];
 export interface ApiErrorBody { error: { code: ApiErrorCode; message: string } }
 export interface PaneSnapshot { text: string; capturedAt: string; lines: number; source: 'agtx' | 'tmux' }
 export interface ApprovalOption { key: string; shortcut: string | null; label: string; meaning: ApprovalMeaning; warn: boolean; sendable: boolean; unsendableReason?: 'key_not_in_target_set' }
-export interface ApprovalPrompt { terminalOnly?: true; kind: ApprovalKind; detail: string | null; agentKind: AgentKind; question: string; options: ApprovalOption[]; fingerprint: string; capturedAt: string }
+export interface ApprovalPrompt { confirm: 'key' | 'enter'; selected?: string | null; terminalOnly?: true; kind: ApprovalKind; detail: string | null; agentKind: AgentKind; question: string; options: ApprovalOption[]; fingerprint: string; capturedAt: string }
 export type ApprovalTarget = { kind: 'task'; taskId: string } | { kind: 'orchestrator' };
 export interface PrInfo { url: string | null; number: number | null; state: PrDisplayState; fetchedAt: string | null }
 export interface TestResultInfo { status: 'not_available'; source: string | null }

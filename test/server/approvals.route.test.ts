@@ -19,7 +19,7 @@ function setup(kind: 'task'|'orchestrator' = 'task', pane = text) {
 it.each(['task','orchestrator'] as const)('sends once to %s and returns the refreshed pane',async kind => {
  const ctx = setup(kind);
  const response = await ctx.post(); expect(response.status).toBe(200);
- const result = await response.json(); expect(result).toMatchObject({ requestId: ctx.body.requestId, outcome: 'sent', after: { text } });
+ const result = await response.json(); expect(result).toMatchObject({ requestId: ctx.body.requestId, outcome: 'sent_unconfirmed', after: { text } });
  expect(await (await ctx.post()).json()).toEqual(result);
  expect(kind === 'task' ? ctx.gateway.sentKeys : ctx.orchestrator.keys).toHaveLength(1);
  expect(ctx.logs.join('')).not.toContain('pnpm test');
@@ -109,4 +109,49 @@ it.each(['task','orchestrator'] as const)('never sends terminal selector keys to
  }
  expect((await ctx.post({...ctx.body,fingerprint:'0'.repeat(64),requestId:randomUUID()})).status).toBe(409);
  expect(ctx.gateway.sentKeys).toHaveLength(0); expect(ctx.orchestrator.keys).toHaveLength(0);
+});
+
+const trust = readFileSync('test/fixtures/panes/codex-trust.real.txt','utf8');
+it.each(['task','orchestrator'] as const)('confirms trust safely on %s and caches both steps',async kind=> {
+ for (const key of ['1','2']) {
+  const ctx = setup(kind,trust); ctx.body.key = key;
+  const onKey = (sent:string)=> {
+   const next = sent==='Enter' ? 'Done' : key==='2' ? trust.replace('› 1.','  1.').replace('  2.','› 2.') : trust;
+   ctx.gateway.setPane(TASK_ID,next); ctx.orchestrator.text = next;
+  };
+  ctx.gateway.onKey = (_id,key)=>onKey(key); ctx.orchestrator.onKey = onKey;
+  const result = await (await ctx.post()).json();
+  expect(result).toMatchObject({outcome:'sent',after:{text:'Done'}});
+  expect(await (await ctx.post()).json()).toEqual(result);
+  expect(kind==='task' ? ctx.gateway.sentKeys.map(x=>x.key) : ctx.orchestrator.keys).toEqual([key,'Enter']);
+ }
+});
+it.each(['unchanged','changed','read-failed','number-unknown','enter-unknown','enter-rejected','remaining'] as const)('handles trust %s without retry',async mode=> {
+ const ctx = setup('task',trust);
+ if (mode==='unchanged') ctx.body.key = '2';
+ ctx.gateway.onKey = ()=> {
+  if (mode==='changed') ctx.gateway.setPane(TASK_ID,'Done');
+  if (mode==='read-failed') ctx.gateway.failNext('readPane',new GatewayError('timeout'));
+ };
+ if (mode==='number-unknown') vi.spyOn(ctx.gateway,'sendKey').mockResolvedValue({outcome:'unknown'});
+ if (mode==='enter-unknown' || mode==='enter-rejected') vi.spyOn(ctx.gateway,'sendKey').mockResolvedValueOnce({outcome:'sent'}).mockResolvedValueOnce({outcome:mode==='enter-unknown' ? 'unknown' : 'rejected'});
+ const spy = vi.spyOn(ctx.gateway,'sendKey');
+ const result = await (await ctx.post()).json();
+ expect(result.outcome).toBe(mode==='remaining' ? 'sent_unconfirmed' : mode==='enter-rejected' ? 'rejected' : 'unknown');
+ if (mode==='unchanged' || mode==='read-failed') expect(result.reason).toBe('selection_unverified');
+ if (mode==='changed') expect(result.reason).toBe('prompt_changed');
+ expect(spy.mock.calls.map(x=>x[1])).toEqual(mode.startsWith('enter-') || mode==='remaining' ? ['1','Enter'] : [ctx.body.key]);
+ await ctx.post(); expect(spy).toHaveBeenCalledTimes(mode.startsWith('enter-') || mode==='remaining' ? 2 : 1);
+});
+it.each(['task','orchestrator'] as const)('sends exec keys once without Enter on %s',async kind=> {
+ for (const key of ['1','3']) for (const changed of [false,true]) {
+  const ctx = setup(kind,readFileSync('test/fixtures/panes/codex-exec-approval.real.txt','utf8')); ctx.body.key = key;
+  if (changed) { ctx.gateway.onKey = ()=>ctx.gateway.setPane(TASK_ID,'Done'); ctx.orchestrator.onKey = ()=> { ctx.orchestrator.text='Done'; }; }
+  expect(await (await ctx.post()).json()).toMatchObject({outcome:changed ? 'sent' : 'sent_unconfirmed'});
+  expect(kind==='task' ? ctx.gateway.sentKeys.map(x=>x.key) : ctx.orchestrator.keys).toEqual([key]);
+ }
+});
+it('marks delivered input unverified if final refresh fails',async ()=> {
+ const ctx = setup(); ctx.gateway.onKey = ()=>ctx.gateway.failNext('readPane',new GatewayError('timeout'));
+ expect(await (await ctx.post()).json()).toMatchObject({outcome:'sent',reason:'unverified'});
 });

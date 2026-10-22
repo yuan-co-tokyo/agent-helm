@@ -6,7 +6,7 @@ import { apiGet, apiPost, HelmApiError } from '../../src/web/api/client.js';
 import type { OrchestratorScreenResponse } from '../../src/shared/api.js';
 import { isUuid } from '../../src/shared/constants.js';
 vi.mock('../../src/web/api/client.js',async importOriginal=>({...await importOriginal<object>(),apiGet:vi.fn(),apiPost:vi.fn()}));
-const pane:OrchestratorScreenResponse = {text:'<script>untrusted</script>\nconfirm output',capturedAt:'2026-10-21T10:00:00Z',lines:2,source:'tmux',inputReady:{ok:false},approval:{agentKind:'codex',kind:'approval',detail:'',question:'Allow?',fingerprint:'original',capturedAt:'2026-10-21T10:00:00Z',options:[{key:'1',label:'Yes',meaning:'approve',shortcut:null,warn:false,sendable:true},{key:'2',label:'No',meaning:'deny',shortcut:null,warn:false,sendable:true},{key:'3',label:'Always',meaning:'approve_always',shortcut:null,warn:true,sendable:true},{key:'4',label:'Other',meaning:'unknown',shortcut:null,warn:false,sendable:true}]}};
+const pane:OrchestratorScreenResponse = {text:'<script>untrusted</script>\nconfirm output',capturedAt:'2026-10-21T10:00:00Z',lines:2,source:'tmux',inputReady:{ok:false},approval:{confirm:'key',agentKind:'codex',kind:'approval',detail:'',question:'Allow?',fingerprint:'original',capturedAt:'2026-10-21T10:00:00Z',options:[{key:'1',label:'Yes',meaning:'approve',shortcut:null,warn:false,sendable:true},{key:'2',label:'No',meaning:'deny',shortcut:null,warn:false,sendable:true},{key:'3',label:'Always',meaning:'approve_always',shortcut:null,warn:true,sendable:true},{key:'4',label:'Other',meaning:'unknown',shortcut:null,warn:false,sendable:true}]}};
 beforeEach(()=> { vi.mocked(apiGet).mockResolvedValue(pane); vi.mocked(apiPost).mockResolvedValue({outcome:'sent',requestId:'x',after:{...pane,text:'after output'}}); });
 afterEach(()=> { cleanup(); vi.resetAllMocks(); vi.useRealTimers(); });
 async function setup() { render(<ApprovalPanel target={{kind:'orchestrator'}} projectName="Project" />); await screen.findByText('Allow?'); }
@@ -80,4 +80,16 @@ test('formats capture times in the panel and confirmation',async()=> {
  expect(screen.getByText('取得時刻: '+formatTime(pane.capturedAt))).toBeTruthy();
  const dialog = openDialog(); expect(dialog.getByText('取得時刻: '+formatTime(pane.capturedAt))).toBeTruthy();
  expect(screen.queryByText('取得時刻: '+pane.capturedAt)).toBeNull();
+});
+test('explains trust Enter confirmation and holds unconfirmed actions until refresh',async()=> {
+ vi.mocked(apiGet).mockResolvedValue({...pane,approval:{...pane.approval!,confirm:'enter'}});
+ vi.mocked(apiPost).mockResolvedValue({outcome:'sent_unconfirmed',requestId:'x',after:{...pane,text:'unchanged output'}});
+ await setup(); expect(screen.getByText('数字で選択後、カーソル確認のうえ Enter を送ります')).toBeTruthy();
+ const dialog = openDialog(); expect(dialog.getByText(/押すキー: \[1\] → Enter/)).toBeTruthy();
+ vi.mocked(apiGet).mockReturnValue(new Promise(()=>{}));
+ fireEvent.click(dialog.getByRole('button',{name:'送信'}));
+ await screen.findByText('キーは届きましたが画面が変わっていません。端末で確認してください');
+ expect(screen.getByText('unchanged output')).toBeTruthy();
+ expect((screen.getByRole('button',{name:'[1] Yes 承認'}) as HTMLButtonElement).disabled).toBe(true);
+ expect(apiPost).toHaveBeenCalledTimes(1);
 });
