@@ -1,5 +1,6 @@
-import type { AgtxKey, PaneSnapshot } from '../../shared/api.js';
-import { stripAnsi } from '../text.js';
+import type { AgtxKey } from '../../shared/api.js';
+import type { AgtxPane } from './types.js';
+import { stripAnsi, stripFaint } from '../text.js';
 import { assertTaskId, clampLines, isAgtxKey } from './schemas.js';
 import { GatewayError } from './types.js';
 import type { AgtxGateway, AgtxHealth, ProjectRef, TaskDetail, KeySendResult } from './types.js';
@@ -29,10 +30,10 @@ export class MockAgtxGateway implements AgtxGateway {
   if (!task) throw new GatewayError('not_found',404);
   return structuredClone(task);
  }
- async readPane(id: string, lines = 200): Promise<PaneSnapshot> {
+ async readPane(id: string, lines = 200): Promise<AgtxPane> {
   assertTaskId(id); this.check('readPane');
   if (!this.panes.has(id)) throw new GatewayError('not_found',404);
-  return { text: stripAnsi(this.panes.get(id)!), lines: clampLines(lines), source: 'agtx', capturedAt: new Date().toISOString() };
+  return { text: stripAnsi(this.panes.get(id)!), inputText: stripFaint(this.panes.get(id)!), lines: clampLines(lines), source: 'agtx', capturedAt: new Date().toISOString() };
  }
  async sendKey(id: string, key: AgtxKey): Promise<KeySendResult> {
   if (!isAgtxKey(key)) return { outcome: 'rejected', reason: 'key_not_allowed' };

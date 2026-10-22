@@ -1,7 +1,7 @@
 import { tailLines } from '../approval/normalize.js';
 import type { AgtxStatus, ApprovalPrompt, OrchestratorStatus, StateResponse, TaskDetailView, TaskView } from '../../shared/api.js';
 import { GatewayError } from '../agtx/types.js';
-import type { AgtxGateway, TaskDetail, TaskSummary } from '../agtx/types.js';
+import type { AgtxGateway, AgtxPane, TaskDetail, TaskSummary } from '../agtx/types.js';
 import type { AppDeps } from '../app.js';
 import type { Logger } from '../log.js';
 import type { OrchestratorAdapter } from '../orchestrator/types.js';
@@ -57,7 +57,7 @@ export class StatusService {
     if (needsPaneCheck(task, this.deps.detector)) {
      try {
       const pane = await this.deps.gateway.readPane(task.id, 200);
-      input = inputState(pane.text);
+      input = inputState(pane.text, pane.inputText);
       approval = this.deps.detector!.detect(tailLines(pane.text).join('\n'), pane.capturedAt, task.agent);
      } catch { /* Detection and pane failure are not approval evidence. */ }
     }
@@ -76,7 +76,7 @@ export class StatusService {
    agentState: task.agentState ?? null, phaseAgeSecs: task.phaseAgeSecs, displayState,
    attentionReason: attentionFor(task, displayState, approval, tuiConnected).reason, depsSatisfied: task.depsSatisfied,
    blockingTasks: 'blockingTasks' in task ? task.blockingTasks : [],
-   cycle: task.cycle, branchName: task.branchName, pr: await this.deps.pr.lookup(task.prUrl ?? null, task.prNumber, { wait }), updatedAt: task.updatedAt };
+   cycle: task.cycle, branchName: task.branchName, pr: await this.deps.pr.lookup(task.prUrl ?? null, task.prNumber, { wait, branch: task.prUrl ? null : task.branchName, cwd: this.deps.gateway.cachedProject?.path ?? null }), updatedAt: task.updatedAt };
  }
  async getTaskDetail(id: string): Promise<TaskDetailView> {
   const [tuiConnected, tasks] = await Promise.all([
@@ -84,7 +84,7 @@ export class StatusService {
   ]);
   if (!tasks.some(task => task.id === id)) throw new GatewayError('not_found');
   const task = await this.deps.gateway.getTask(id);
-  let pane: TaskDetailView['pane'] = null;
+  let pane: AgtxPane | null = null;
   let paneError: TaskDetailView['paneError'] = null;
   let approval: ApprovalPrompt | null = null;
   try { pane = await this.deps.gateway.readPane(id, 200); }
@@ -92,10 +92,10 @@ export class StatusService {
   if (pane && this.deps.detector && needsApprovalCheck(task)) {
    try { approval = this.deps.detector.detect(tailLines(pane.text).join('\n'), pane.capturedAt, task.agent); } catch { /* Leave approval null. */ }
   }
-  return { ...await this.toTaskView(task, approval, tuiConnected, true, pane ? inputState(pane.text) : null),
+  return { ...await this.toTaskView(task, approval, tuiConnected, true, pane ? inputState(pane.text, pane.inputText) : null),
    description: task.description, worktreePath: task.worktreePath, sessionName: task.sessionName, baseBranch: task.baseBranch,
    referencedTasks: task.referencedTasks, blockedReason: task.blockedReason, escalationNote: task.escalationNote,
-   pane, paneError, approval, testResult: { status: 'not_available', source: 'pane' } };
+   pane: pane ? { text: pane.text, capturedAt: pane.capturedAt, lines: pane.lines, source: pane.source } : null, paneError, approval, testResult: { status: 'not_available', source: 'pane' } };
  }
 }
 const services = new WeakMap<AppDeps, StatusService>();

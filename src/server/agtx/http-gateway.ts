@@ -1,9 +1,10 @@
 import { z } from 'zod';
-import type { AgtxKey, PaneSnapshot } from '../../shared/api.js';
+import type { AgtxKey } from '../../shared/api.js';
 import { SUPPORTED_AGTX_VERSION } from '../../shared/constants.js';
 import { isLoopbackUrl } from '../config.js';
 import type { Logger } from '../log.js';
-import { stripAnsi } from '../text.js';
+import type { AgtxPane } from './types.js';
+import { stripAnsi, stripFaint } from '../text.js';
 import { GatewayError } from './types.js';
 import type { AgtxGateway, AgtxHealth, ProjectRef, KeySendResult } from './types.js';
 import { assertTaskId, clampLines, detailSchema, healthSchema, isAgtxKey, paneSchema, parseResponse, projectSchema, summarySchema } from './schemas.js';
@@ -62,10 +63,10 @@ export class HttpAgtxGateway implements AgtxGateway {
  }
  async listTasks() { return parseResponse(z.array(summarySchema),await this.request('GET',await this.taskPath())); }
  async getTask(id: string) { return parseResponse(detailSchema,await this.request('GET',await this.taskPath(id))); }
- async readPane(id: string, lines = 200): Promise<PaneSnapshot> {
+ async readPane(id: string, lines = 200): Promise<AgtxPane> {
   const count = clampLines(lines);
   const text = parseResponse(paneSchema, await this.request('GET',await this.taskPath(id) + '/pane?lines=' + count));
-  return { text: stripAnsi(text), capturedAt: new Date(this.now()).toISOString(), lines: count, source: 'agtx' };
+  return { text: stripAnsi(text), inputText: stripFaint(text), capturedAt: new Date(this.now()).toISOString(), lines: count, source: 'agtx' };
  }
  async sendKey(id: string, key: AgtxKey): Promise<KeySendResult> {
   if (!isAgtxKey(key)) return { outcome: 'rejected', reason: 'key_not_allowed' };

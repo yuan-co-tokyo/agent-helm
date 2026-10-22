@@ -11,13 +11,14 @@ function activeLines(text: string) {
  while (start > 0 && !/^[\s─━═╭╮╰╯│┌┐└┘-]*$/.test(lines[start - 1]!)) start--;
  return { lines: lines.slice(start), index: index - start };
 }
-export function assessInputReady(text: string, { approval }: { approval: ApprovalPrompt | null }): InputReady {
+export function assessInputReady(text: string, { approval, placeholder }: { approval: ApprovalPrompt | null; placeholder?: ((rest: string) => boolean) | undefined }): InputReady {
  const { lines, index } = activeLines(text);
  const reject = (reason: string): InputReady => ({ ok: false, reason });
  if (approval || approvalPattern.test(lines.join('\n'))) return reject('approval_pending');
  if (lines.some((line,i) => /^\s*[❯›>]\s*\d+\./.test(line) || (numbered.test(line) && numbered.test(lines[i + 1] ?? '')))) return reject('menu_open');
  if (index < 0) return reject('prompt_not_found');
  if (lines.slice(index + 1).some(line => /^\s*[/@]\S+/.test(line))) return reject('completion_open');
- if (lines[index]!.replace(promptPattern,'').replace(/[\u00a0│]/g,'').trim()) return reject('input_not_empty');
+ const rest = lines[index]!.replace(promptPattern,'').replace(/[\u00a0│]/g,'').trim();
+ if (rest && !placeholder?.(rest)) return reject('input_not_empty');
  return { ok: true };
 }

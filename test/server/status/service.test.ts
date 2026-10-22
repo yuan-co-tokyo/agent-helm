@@ -104,3 +104,25 @@ it.each([true,false])('ignores stale detail health after failure: %s',async tuiC
  expect(detail.attentionReason).toBeNull();
  expect(gateway.lastHealth?.tuiConnected).toBe(tuiConnected);
 });
+it.each(['done','backlog'] as const)('does not alert or inspect panes for %s', async status => {
+ const { gateway, service } = setup();
+ gateway.setTasks([task({ status, phaseStatus:'blocked', escalationNote:'old', depsSatisfied:false, tuiConnected:false })]);
+ const pane = vi.spyOn(gateway,'readPane');
+ expect(await service.getState()).toMatchObject({ tasks:[{ displayState:status }], attention:[] });
+ expect(pane).not.toHaveBeenCalled();
+});
+it('passes repository context and hides internal input text from the detail API', async () => {
+ const gateway = new MockAgtxGateway(); gateway.setProject({ ...gateway.project,path:'/tmp/repo' }); await gateway.resolveProject();
+ gateway.setTasks([task({ branchName:'feature/test',prUrl:null,phaseStatus:'exited',agent:'codex' })]);
+ gateway.setPane(task().id,'› \x1b[2mplaceholder\x1b[0m');
+ const lookup = vi.fn().mockResolvedValue({ url:null,number:null,state:'none',fetchedAt:null });
+ const service = new StatusService({ gateway,orchestrator:new MockOrchestratorAdapter(),pr:{ lookup },detector:{ detect:()=>null } });
+ expect((await service.getState()).tasks[0]?.displayState).toBe('awaiting_input');
+ expect(lookup).toHaveBeenLastCalledWith(null,task().prNumber,{ wait:false,branch:'feature/test',cwd:'/tmp/repo' });
+ const detail = await service.getTaskDetail(task().id);
+ expect(detail.displayState).toBe('awaiting_input'); expect(detail.pane).not.toHaveProperty('inputText');
+ expect(detail.pane?.text).toBe('› placeholder');
+ gateway.setTasks([task({ prUrl:'https://github.com/o/r/pull/1',branchName:'feature/test' })]);
+ await service.getState();
+ expect(lookup).toHaveBeenLastCalledWith('https://github.com/o/r/pull/1',task().prNumber,{ wait:false,branch:null,cwd:'/tmp/repo' });
+});

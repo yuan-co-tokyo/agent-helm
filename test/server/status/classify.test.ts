@@ -53,7 +53,8 @@ it.each(['codex','claude',null])('only treats known exited agents as awaiting in
 });
 
 it.each([
- ['codex-idle-input','not_empty'], ['shell-prompt',null], ['codex-exec-approval.real',null], ['codex-trust.real',null]
+ ['codex-idle-input','empty'] // Exact known placeholder, not typed input.
+ , ['shell-prompt',null], ['codex-exec-approval.real',null], ['codex-trust.real',null]
 ])('recognizes input readiness from %s', (name,expected)=> {
  expect(inputState(readFileSync(`test/fixtures/panes/${name}.txt`,'utf8'))).toBe(expected);
 });
@@ -66,4 +67,32 @@ it.each(['❯ ', '› ', '❯ abc', '› Ask Codex…'])('distinguishes empty an
  const state = classifyTask({task:current,approval:null,agtxTuiConnected:true,disconnected:false,input:inputState(text)});
  expect(state).toBe(text.trim().length === 1 ? 'awaiting_input' : 'input_pending');
  expect(attentionFor(current,state,null).item?.kind ?? null).toBe(state === 'input_pending' ? 'input' : null);
+});
+
+it.each(['done','backlog'] as const)('keeps %s out of runtime attention and pane reads', status => {
+ for (const phaseStatus of ['idle','blocked'] as const) {
+  const current = task({ status, phaseStatus, tuiConnected: false, phaseAgeSecs: 3600, escalationNote: 'old', depsSatisfied: false });
+  const args = { task: current, approval: prompt, agtxTuiConnected: false, disconnected: false };
+  expect(classifyTask(args)).toBe(status);
+  expect(classifyTask({ ...args, disconnected: true })).toBe('disconnected');
+  expect(attentionFor(current,status,null).item).toBeNull();
+  expect(needsPaneCheck(current,{})).toBe(false);
+ }
+});
+it.each(['Ask Codex to do anything','Implement {feature}','Explain this codebase','Try "fix lint errors"'])('recognizes exact placeholder %s', text => {
+ expect(inputState(`› ${text}`)).toBe('empty');
+ expect(inputState(`› ${text} extra`)).toBe('not_empty');
+ // SGR evidence overrides text fallback: normal-colored text is actual input.
+ expect(inputState(`› ${text}`, `› ${text}`)).toBe('not_empty');
+});
+it('uses style evidence without removing approval or completion guards', () => {
+ expect(inputState('› placeholder','› ')).toBe('empty');
+ expect(inputState('› placeholder','› typed')).toBe('not_empty');
+ expect(inputState('› Ask Codex…')).toBe('not_empty');
+ expect(inputState('› unknown')).toBe('not_empty');
+});
+it.each(['codex','claude'])('recognizes estimated %s ANSI fixture', async agent => {
+ const { stripAnsi,stripFaint } = await import('../../../src/server/text.js');
+ const raw = readFileSync(`test/fixtures/panes/${agent}-placeholder.estimated.ansi.txt`,'utf8');
+ expect(inputState(stripAnsi(raw),stripFaint(raw))).toBe('empty');
 });

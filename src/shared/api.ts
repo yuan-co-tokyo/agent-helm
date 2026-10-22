@@ -1,6 +1,6 @@
 export const TASK_STATUSES = ['backlog','planning','running','review','done'] as const;
 export const PHASE_STATUSES = ['working','blocked','idle','ready','exited'] as const;
-export const DISPLAY_STATES = ['disconnected','stale','approval','blocked','error','reviewing','phase_done','awaiting_input','input_pending','running','idle','unknown'] as const;
+export const DISPLAY_STATES = ['disconnected','stale','approval','blocked','error','reviewing','phase_done','awaiting_input','input_pending','running','idle','done','backlog','unknown'] as const;
 export const AGTX_KEYS = ['y','n','1','2','3','Enter','Escape','Up','Down'] as const;
 export const ORCHESTRATOR_KEYS = ['y','n','a','1','2','3','4','Enter','Escape','Up','Down'] as const;
 export const PR_DISPLAY_STATES = ['none','open_review_pending','approved_waiting_merge','merged','closed','unknown'] as const;

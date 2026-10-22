@@ -2,8 +2,9 @@ import { assessInputReady } from '../tmux/input-ready.js';
 import { TERMINAL_ONLY_MESSAGE } from '../../shared/constants.js';
 import type { ApprovalPrompt, AttentionItem, DisplayState } from '../../shared/api.js';
 import type { TaskDetail, TaskSummary } from '../agtx/types.js';
-export function inputState(text: string): 'empty' | 'not_empty' | null {
- const result = assessInputReady(text,{ approval: null });
+const placeholders = new Set(['Ask Codex to do anything', 'Implement {feature}', 'Explain this codebase']);
+export function inputState(text: string, styled?: string | null): 'empty' | 'not_empty' | null {
+ const result = assessInputReady(styled ?? text,{ approval: null, placeholder: styled == null ? rest => placeholders.has(rest) || /^Try "[^"]+"$/.test(rest) : undefined });
  return result.ok ? 'empty' : result.reason === 'input_not_empty' ? 'not_empty' : null;
 }
 export const STALE_PHASE_AGE_SECS = 30;
@@ -13,6 +14,7 @@ export function classifyTask({ task, agtxTuiConnected, approval, disconnected, i
  input?: 'empty' | 'not_empty' | null; task: Task; agtxTuiConnected: boolean | null; approval: ApprovalPrompt | null; disconnected: boolean;
 }): DisplayState {
  if (disconnected) return 'disconnected';
+ if (task.status === 'done' || task.status === 'backlog') return task.status;
  if (task.tuiConnected === false || agtxTuiConnected === false || (task.phaseAgeSecs ?? 0) > STALE_PHASE_AGE_SECS) return 'stale';
  if (approval) return 'approval';
  if (task.phaseStatus === 'blocked' || task.agentState === 'blocked') return 'blocked';
@@ -27,7 +29,7 @@ export function attentionFor(task: Task, displayState: DisplayState, approval: A
  agtxTuiConnected: boolean | null = null): { reason: string | null; item: AttentionItem | null } {
  let kind: AttentionItem['kind'] = 'blocked';
  let reason: string | null = null;
- let actionable = true;
+ let actionable = active(task);
  if (displayState === 'approval' && approval) { kind = 'approval'; reason = approval.terminalOnly ? `${approval.question}（${TERMINAL_ONLY_MESSAGE}）` : approval.question; }
  else if (displayState === 'blocked') reason = ('blockedReason' in task ? task.blockedReason : null) ?? '理由不明';
  else if (displayState === 'awaiting_input') { reason = '入力待ち（agtx は exited と報告）'; actionable = false; }
@@ -52,7 +54,7 @@ export function needsDetail(task: TaskSummary): boolean {
   (task.phaseAgeSecs ?? 0) > STALE_PHASE_AGE_SECS || task.tuiConnected === false)) || task.depsSatisfied === false || !!task.escalationNote;
 }
 export function needsApprovalCheck(task: Task): boolean {
- return ['blocked','idle'].includes(task.phaseStatus ?? '') || (active(task) && (task.phaseStatus === 'exited' || task.phaseStatus === null));
+ return active(task) && (['blocked','idle','exited'].includes(task.phaseStatus ?? '') || task.phaseStatus === null);
 }
 export function needsPaneCheck(task: Task, detector: unknown): task is TaskDetail {
  return !!detector && 'sessionName' in task && !!task.sessionName && needsApprovalCheck(task);
