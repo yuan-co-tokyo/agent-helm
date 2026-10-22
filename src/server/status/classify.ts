@@ -1,3 +1,4 @@
+import { TERMINAL_ONLY_MESSAGE } from '../../shared/constants.js';
 import type { ApprovalPrompt, AttentionItem, DisplayState } from '../../shared/api.js';
 import type { TaskDetail, TaskSummary } from '../agtx/types.js';
 export const STALE_PHASE_AGE_SECS = 30;
@@ -22,7 +23,7 @@ export function attentionFor(task: Task, displayState: DisplayState, approval: A
  let kind: AttentionItem['kind'] = 'blocked';
  let reason: string | null = null;
  let actionable = true;
- if (displayState === 'approval' && approval) { kind = 'approval'; reason = approval.question; }
+ if (displayState === 'approval' && approval) { kind = 'approval'; reason = approval.terminalOnly ? `${approval.question}（${TERMINAL_ONLY_MESSAGE}）` : approval.question; }
  else if (displayState === 'blocked') reason = ('blockedReason' in task ? task.blockedReason : null) ?? '理由不明';
  else if (displayState === 'error') { kind = 'error'; reason = 'phase exited'; }
  else if (displayState === 'stale') {

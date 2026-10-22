@@ -38,6 +38,7 @@ export function registerApprovalRoutes(app: Hono, deps: AppDeps) {
   const pane = await read();
   const raw = detectApproval(pane.text,{ capturedAt: pane.capturedAt, agentHint });
   if (!raw || raw.fingerprint !== request.fingerprint) return error(409,'stale','Approval prompt changed');
+  if (raw.terminalOnly) return error(400,'key_not_sendable','This prompt must be answered in the terminal');
   const prompt = toApprovalPrompt(raw,target.kind);
   const option = prompt.options.find(item => item.key === request.key);
   if (!option) return error(400,'bad_request','Key is not an approval option');

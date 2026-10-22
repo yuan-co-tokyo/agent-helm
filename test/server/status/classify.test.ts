@@ -38,3 +38,7 @@ it('limits detail and pane work', () => {
  expect(needsPaneCheck(task({ phaseStatus: 'idle' }), null)).toBe(false);
  expect(needsPaneCheck(task(), {})).toBe(false);
 });
+
+it('explains terminal-only approval attention',()=> {
+ expect(attentionFor(task(),'approval',{...prompt,terminalOnly:true}).item).toMatchObject({kind:'approval',reason:expect.stringContaining('この確認は端末（agtx TUI）で操作してください')});
+});

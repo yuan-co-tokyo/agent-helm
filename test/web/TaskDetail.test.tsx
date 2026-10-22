@@ -15,3 +15,13 @@ describe('TaskDetail', () => {
   expect(screen.getByLabelText('承認')).toBeTruthy();
  });
 });
+
+it('explains invalid IDs without loading or mounting approval',()=> {
+ const renderApproval = vi.fn();
+ render(<TaskDetail taskId="invalid" detail={null} connected={false} onClose={vi.fn()} lastSuccessAt={null} error={null} renderApproval={renderApproval} />);
+ expect(screen.getByText('不正なタスクIDです')).toBeTruthy(); expect(screen.queryByText('取得中…')).toBeNull(); expect(renderApproval).not.toHaveBeenCalled();
+});
+it('shows terminal guidance before the pane',()=> {
+ render(<TaskDetail taskId={detail.id} detail={{...detail,approval:{terminalOnly:true,agentKind:'claude',kind:'trust',question:'Trust?',detail:null,options:[],capturedAt:'now',fingerprint:'a'}}} connected onClose={vi.fn()} lastSuccessAt={null} error={null} renderApproval={()=>null} />);
+ expect(screen.getByText('この確認は端末（agtx TUI）で操作してください')).toBeTruthy();
+});

@@ -23,7 +23,7 @@ export type ApiErrorCode = typeof API_ERROR_CODES[number];
 export interface ApiErrorBody { error: { code: ApiErrorCode; message: string } }
 export interface PaneSnapshot { text: string; capturedAt: string; lines: number; source: 'agtx' | 'tmux' }
 export interface ApprovalOption { key: string; shortcut: string | null; label: string; meaning: ApprovalMeaning; warn: boolean; sendable: boolean; unsendableReason?: 'key_not_in_target_set' }
-export interface ApprovalPrompt { kind: ApprovalKind; detail: string | null; agentKind: AgentKind; question: string; options: ApprovalOption[]; fingerprint: string; capturedAt: string }
+export interface ApprovalPrompt { terminalOnly?: true; kind: ApprovalKind; detail: string | null; agentKind: AgentKind; question: string; options: ApprovalOption[]; fingerprint: string; capturedAt: string }
 export type ApprovalTarget = { kind: 'task'; taskId: string } | { kind: 'orchestrator' };
 export interface PrInfo { url: string | null; number: number | null; state: PrDisplayState; fetchedAt: string | null }
 export interface TestResultInfo { status: 'not_available'; source: string | null }

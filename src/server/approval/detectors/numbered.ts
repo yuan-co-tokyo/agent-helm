@@ -2,6 +2,8 @@ import type { AgentKind, ApprovalPrompt } from '../../../shared/api.js';
 import { fingerprint, stripFrame } from '../normalize.js';
 import { classifyMeaning } from '../meaning.js';
 export type RawPrompt = Omit<ApprovalPrompt,'options'> & { options: (Omit<ApprovalPrompt['options'][number],'sendable'> & { requiresFullWord?: boolean })[]; end: number };
+// The real Claude command heading is eight lines above the question.
+const CLAUDE_COMMAND_LOOKBACK = 12;
 const footer = (line: string) => !line || /^(press enter\b.*|esc to cancel\b.*|enter continue.*|[↑↓].*)$/i.test(line);
 const option = /^(?:[❯›>▶]\s*)?([1-9])\.\s+(.+)$/;
 export function detectNumbered(lines: string[], capturedAt: string, agentKind: AgentKind, questionStart: RegExp): RawPrompt | null {
@@ -40,7 +42,7 @@ export function detectNumbered(lines: string[], capturedAt: string, agentKind: A
    // block so changing only the command invalidates a pending confirmation.
    let regionStart = q;
    if (agentKind === 'claude') {
-    for (let i = q - 1; i >= 0; i--) {
+    for (let i = q - 1; i >= Math.max(0, q - CLAUDE_COMMAND_LOOKBACK); i--) {
      if (/^[❯›>▶]/.test(clean[i]!)) break;
      if (/^Bash command$/i.test(clean[i]!)) { regionStart = i; break; }
     }

@@ -44,3 +44,14 @@ test('scroll follows output only while pinned',()=> {
  expect(element.scrollTop).toBe(200); expect(result.current.pinned).toBe(false);
  act(()=>result.current.jump()); expect(element.scrollTop).toBe(1000);
 });
+
+test('tracks request starts across failures and effect restarts',async()=> {
+ vi.useFakeTimers(); const fetcher = vi.fn<()=>Promise<string>>().mockResolvedValue('first');
+ const {result,rerender} = renderHook(({enabled})=>usePaneScreenPolling(fetcher,1500,enabled),{initialProps:{enabled:true}});
+ await act(async()=>{}); expect(result.current.seq).toBe(1); expect(result.current.startedSeq()).toBe(1);
+ fetcher.mockRejectedValueOnce(new Error('offline'));
+ await act(async()=>{await vi.advanceTimersByTimeAsync(1500);});
+ expect(result.current.seq).toBe(1); expect(result.current.startedSeq()).toBe(2);
+ rerender({enabled:false}); rerender({enabled:true}); await act(async()=>{});
+ expect(result.current.seq).toBe(3); expect(result.current.startedSeq()).toBe(3);
+});
