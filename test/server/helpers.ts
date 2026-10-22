@@ -6,11 +6,14 @@ import { MockOrchestratorAdapter } from '../../src/server/orchestrator/mock-adap
 import { createLogger } from '../../src/server/log.js';
 export const example = JSON.parse(readFileSync('agent-helm.config.example.json','utf8'));
 export const config = () => loadConfig({ env: {}, readFile: () => JSON.stringify(example) });
-export function makeApp(staticRoot?: string) {
+import { StatusService } from '../../src/server/status/service.js';
+import type { ApprovalDetector } from '../../src/server/status/types.js';
+export function makeApp(staticRoot?: string, options: { statusService?: StatusService; approvalDetector?: ApprovalDetector | null } = {}) {
  const logs: string[] = [];
  const gateway = new MockAgtxGateway();
  const orchestrator = new MockOrchestratorAdapter();
- const app = createApp({ config: config(), gateway, orchestrator, csrfToken: 'test-csrf-secret', appVersion: '0.1.0', logger: createLogger(line => logs.push(line)), staticRoot });
- return { app, logs, gateway, orchestrator };
+ const statusService = options.statusService ?? new StatusService({ gateway, orchestrator, detector: options.approvalDetector, pr: { async lookup(url, number) { return { url, number, state: url || number !== null ? 'unknown' : 'none', fetchedAt: null }; } } });
+ const app = createApp({ config: config(), gateway, orchestrator, statusService, approvalDetector: options.approvalDetector, csrfToken: 'test-csrf-secret', appVersion: '0.1.0', logger: createLogger(line => logs.push(line)), staticRoot });
+ return { app, logs, gateway };
 }
 export const headers = { host: '127.0.0.1:8790', origin: 'http://127.0.0.1:8790', 'x-helm-csrf': 'test-csrf-secret', 'content-type': 'application/json' };

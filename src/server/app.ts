@@ -15,7 +15,9 @@ import { registerTaskRoutes } from './routes/tasks.js';
 import { registerOrchestratorRoutes } from './routes/orchestrator.js';
 import { registerApprovalRoutes } from './routes/approvals.js';
 import { apiError } from './routes/errors.js';
+import type { StatusService, ApprovalDetector } from './status/index.js';
 export interface AppDeps {
+ statusService?: StatusService; approvalDetector?: ApprovalDetector | null;
  config: HelmConfig; gateway: AgtxGateway; orchestrator: OrchestratorAdapter;
  csrfToken: string; appVersion: string; staticRoot?: string | null; logger: Logger;
 }
