@@ -2,21 +2,21 @@ import { assessInputReady } from '../tmux/input-ready.js';
 import { TERMINAL_ONLY_MESSAGE } from '../../shared/constants.js';
 import type { ApprovalPrompt, AttentionItem, DisplayState } from '../../shared/api.js';
 import type { TaskDetail, TaskSummary } from '../agtx/types.js';
-export function isAwaitingInput(text: string): boolean {
+export function inputState(text: string): 'empty' | 'not_empty' | null {
  const result = assessInputReady(text,{ approval: null });
- return result.ok || result.reason === 'input_not_empty';
+ return result.ok ? 'empty' : result.reason === 'input_not_empty' ? 'not_empty' : null;
 }
 export const STALE_PHASE_AGE_SECS = 30;
 type Task = TaskSummary | TaskDetail;
 const active = (task: Task) => ['planning','running','review'].includes(task.status);
-export function classifyTask({ task, agtxTuiConnected, approval, disconnected, awaitingInput }: {
- awaitingInput?: boolean; task: Task; agtxTuiConnected: boolean | null; approval: ApprovalPrompt | null; disconnected: boolean;
+export function classifyTask({ task, agtxTuiConnected, approval, disconnected, input }: {
+ input?: 'empty' | 'not_empty' | null; task: Task; agtxTuiConnected: boolean | null; approval: ApprovalPrompt | null; disconnected: boolean;
 }): DisplayState {
  if (disconnected) return 'disconnected';
  if (task.tuiConnected === false || agtxTuiConnected === false || (task.phaseAgeSecs ?? 0) > STALE_PHASE_AGE_SECS) return 'stale';
  if (approval) return 'approval';
  if (task.phaseStatus === 'blocked' || task.agentState === 'blocked') return 'blocked';
- if (task.phaseStatus === 'exited' && ['planning','running'].includes(task.status)) return awaitingInput && ['codex','claude'].includes(task.agent ?? '') ? 'awaiting_input' : 'error';
+ if (task.phaseStatus === 'exited' && ['planning','running'].includes(task.status)) return ['codex','claude'].includes(task.agent ?? '') && input ? (input === 'empty' ? 'awaiting_input' : 'input_pending') : 'error';
  if (task.status === 'review' && task.phaseStatus === 'working') return 'reviewing';
  if (task.phaseStatus === 'ready') return 'phase_done';
  if (task.phaseStatus === 'working') return 'running';
@@ -31,6 +31,7 @@ export function attentionFor(task: Task, displayState: DisplayState, approval: A
  if (displayState === 'approval' && approval) { kind = 'approval'; reason = approval.terminalOnly ? `${approval.question}（${TERMINAL_ONLY_MESSAGE}）` : approval.question; }
  else if (displayState === 'blocked') reason = ('blockedReason' in task ? task.blockedReason : null) ?? '理由不明';
  else if (displayState === 'awaiting_input') { reason = '入力待ち（agtx は exited と報告）'; actionable = false; }
+ else if (displayState === 'input_pending') { kind = 'input'; reason = '入力欄に文字が残っています（入力途中またはプレースホルダー・agtx は exited と報告）'; }
  else if (displayState === 'error') { kind = 'error'; reason = 'phase exited'; }
  else if (displayState === 'stale') {
   kind = 'stale'; reason = task.tuiConnected === false || agtxTuiConnected === false ? 'TUI未接続' : `状態更新が ${task.phaseAgeSecs} 秒前`;

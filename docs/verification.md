@@ -83,3 +83,11 @@ AGTX_CONTRACT=1 AGTX_BASE_URL=http://127.0.0.1:8799 pnpm test test/contract
 T6 時点では実 `/input` の本文が未確認だったが、T8 の使い捨て環境で HTTP 200 / `{"delivered":true}` を確認して解消した。数字送信だけでは trust が確定しないため、送信後画面の再取得を結果判定に使う。`delivered:false` は未配送の明示として rejected、空本文・欠落・非 boolean・不正 JSON は unknown とし、自動再送しない（false の実応答はモック検証のみ）。
 
 T6 で `agtx --help` が TUI を起動して検証ワークツリーを自動登録した副作用は過去記録として残す。既存タスクへの代用送信や DB 直接編集は行っていない。
+
+## T9: 詳細状態・ポーリング・入力待ち判定
+
+- 詳細取得ごとに health を確認し、失敗時は TUI 接続状態を不明として扱う。過去の true/false を使わない回帰テストを追加。
+- 詳細と承認パネルで 1.5 秒のポーリングを共有。タスク切替で状態をリセットし、確認中の質問・fingerprint の固定、結果不明時の手動確認、送信後に開始したポールまでの操作ロック、404/410、sent_unconfirmed を検証。
+- exited の Codex / Claude は空の入力欄のみ「入力待ち」。文字ありは `input_pending`（入力途中）で要対応に残す。ANSI 除去後は Codex プレースホルダーと入力文字を区別できないため、プレースホルダーもこの扱いとする。
+- `pnpm typecheck` / `pnpm lint` / `pnpm build` 成功。`pnpm test`: 38 ファイル・339 件成功、任意の実 agtx 契約テスト 1 件スキップ。`pnpm test:e2e`: desktop/mobile 計 8 件成功。
+- HTTP・専用 tmux・Chromium のテストはサンドボックス外で実行。実 agtx への送信は行っていない。
