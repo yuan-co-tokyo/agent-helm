@@ -1,4 +1,4 @@
 import type { ApprovalPrompt, PrInfo } from '../../shared/api.js';
-export interface ApprovalDetector { detect(paneText: string, capturedAt: string): ApprovalPrompt | null }
+export interface ApprovalDetector { detect(paneText: string, capturedAt: string, agentHint?: string | null): ApprovalPrompt | null }
 export interface PrLookup { lookup(url: string | null, number: number | null, opts?: { wait?: boolean }): Promise<PrInfo> }
 export interface StatusClock { now(): number }

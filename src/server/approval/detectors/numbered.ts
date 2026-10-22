@@ -36,7 +36,18 @@ export function detectNumbered(lines: string[], capturedAt: string, agentKind: A
     if (shortcut) { item.shortcut = shortcut[1]!; item.label = item.label.slice(0,shortcut.index); }
     item.meaning = classifyMeaning(item.label); item.warn = item.meaning === 'approve_always';
    }
-   return { agentKind, kind: /trust/i.test(question) ? 'trust' : 'approval', question, detail: clean.slice(questionEnd + 1,start).filter(Boolean).join('\n') || null, options, fingerprint: fingerprint(lines.slice(q,end + 1)), capturedAt, end };
+   // Claude places the command above the question. Include the active command
+   // block so changing only the command invalidates a pending confirmation.
+   let regionStart = q;
+   if (agentKind === 'claude') {
+    for (let i = q - 1; i >= 0; i--) {
+     if (/^[❯›>▶]/.test(clean[i]!)) break;
+     if (/^Bash command$/i.test(clean[i]!)) { regionStart = i; break; }
+    }
+   }
+   const detail = [...clean.slice(regionStart, q), ...clean.slice(questionEnd + 1, start)]
+    .filter(line => line && !/^[─━╌═]+$/.test(line)).join('\n') || null;
+   return { agentKind, kind: /trust/i.test(question) ? 'trust' : 'approval', question, detail, options, fingerprint: fingerprint(lines.slice(regionStart,end + 1)), capturedAt, end };
   }
  }
  return null;

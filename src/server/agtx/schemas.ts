@@ -31,7 +31,7 @@ function normalizeSummary(v: z.infer<typeof summaryRaw>) {
 export const summarySchema = summaryRaw.transform(normalizeSummary);
 export const detailSchema = z.object({
  ...summaryFields, description: nullableText, worktree_path: nullableText, session_name: nullableText,
- base_branch: nullableText, referenced_tasks: strings, created_at: nullableText, blocked_reason: nullableText, blocking_tasks: strings
+ base_branch: nullableText, referenced_tasks: z.union([z.array(z.string()), z.string()]).nullish().transform(v => typeof v === 'string' ? v.split(',').map(id => id.trim()).filter(Boolean) : v ?? []), created_at: nullableText, blocked_reason: nullableText, blocking_tasks: strings
 }).transform(v => ({
  ...normalizeSummary(v), description: v.description, worktreePath: v.worktree_path, sessionName: v.session_name,
  baseBranch: v.base_branch, referencedTasks: v.referenced_tasks, createdAt: v.created_at,

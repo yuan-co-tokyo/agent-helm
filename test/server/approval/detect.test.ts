@@ -59,3 +59,18 @@ describe('approval detection',() => {
   expect(detect('Do you want to proceed?\n1. Yes\n2. No','codex')?.agentKind).toBe('codex');
  });
 });
+
+it('detects real Claude 2.1.307 and Codex 0.156.1 permission screens', () => {
+ const claude = fixture('claude-bash-approval.real');
+ const actual = detect(claude, 'claude')!;
+ expect(actual).toMatchObject({ agentKind: 'claude', kind: 'approval' });
+ expect(actual.options.map(o => o.meaning)).toEqual(['approve', 'deny']);
+ expect(actual.detail).toContain('ls');
+ expect(detect(claude.replace(' ls\n', ' pwd\n'))?.fingerprint).not.toBe(actual.fingerprint);
+ expect(detect(fixture('claude-bash-approval.estimated').replace('pnpm test', 'pnpm build'))?.fingerprint)
+  .not.toBe(detect(fixture('claude-bash-approval.estimated'))?.fingerprint);
+ expect(detect(fixture('codex-exec-approval.real'))).toMatchObject({ agentKind: 'codex', kind: 'approval' });
+ expect(detect(fixture('codex-trust.real'))).toMatchObject({ agentKind: 'codex', kind: 'trust' });
+ // Claude's new unnumbered trust selector has no stable single-key mapping.
+ expect(detect(fixture('claude-trust.real'))).toBeNull();
+});

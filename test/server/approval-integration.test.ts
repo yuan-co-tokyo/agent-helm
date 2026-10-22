@@ -1,0 +1,24 @@
+import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { expect, it } from 'vitest';
+import { createApprovalDetector } from '../../src/server/approval/adapter.js';
+import { headers, makeApp } from './helpers.js';
+import { task } from './status/fixtures.js';
+it.each(['exited', null] as const)('detects real Claude approval with phase %s and rejects a changed command', async phaseStatus => {
+ const { app, gateway } = makeApp({ approval: { settleMs: 0 } }, { approvalDetector: createApprovalDetector('task') });
+ const current = task({ agent: 'claude', phaseStatus, agentState: 'ended' });
+ gateway.setTasks([current]);
+ const text = readFileSync('test/fixtures/panes/claude-bash-approval.real.txt', 'utf8');
+ gateway.setPane(current.id, text + '\n'.repeat(60));
+ expect(await (await app.request('/api/state', { headers })).json()).toMatchObject({ tasks: [{ displayState: 'approval' }], attention: [{ kind: 'approval' }] });
+ const detail = await (await app.request('/api/tasks/' + current.id, { headers })).json();
+ const body = { target: { kind: 'task', taskId: current.id }, fingerprint: detail.approval.fingerprint, key: '2', requestId: randomUUID() };
+ const post = () => app.request('/api/approvals/respond', { method: 'POST', headers, body: JSON.stringify(body) });
+ gateway.setPane(current.id, text.replace(' ls\n', ' pwd\n'));
+ expect((await post()).status).toBe(409);
+ expect(gateway.sentKeys).toEqual([]);
+ gateway.setPane(current.id, text);
+ body.requestId = randomUUID();
+ expect(await (await post()).json()).toMatchObject({ outcome: 'sent' });
+ expect(gateway.sentKeys).toEqual([{ taskId: current.id, key: '2' }]);
+});

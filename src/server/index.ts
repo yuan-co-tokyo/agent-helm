@@ -1,3 +1,4 @@
+import { createApprovalDetector } from './approval/adapter.js';
 import { serve } from '@hono/node-server';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createApp } from './app.js';
@@ -19,7 +20,7 @@ export async function startServer(opts: { config?: HelmConfig; env?: NodeJS.Proc
  try { await gateway.resolveProject(); } catch { logger.warn('agtx_project_unavailable'); }
  const csrfToken = generateCsrfToken();
  // Port 0 is allowed for explicitly injected test configurations only.
- let app = createApp({ config, gateway, orchestrator, csrfToken, logger, appVersion: '0.1.0', staticRoot: fileURLToPath(new URL('../../web',import.meta.url)) });
+ let app = createApp({ config, gateway, orchestrator, approvalDetector: createApprovalDetector('task'), csrfToken, logger, appVersion: '0.1.0', staticRoot: fileURLToPath(new URL('../../web',import.meta.url)) });
  const server = serve({ fetch: (...args) => app.fetch(...args), hostname: config.listen.host, port: config.listen.port });
  const port = await new Promise<number>((resolve,reject) => {
   server.once('error',reject);
@@ -28,7 +29,7 @@ export async function startServer(opts: { config?: HelmConfig; env?: NodeJS.Proc
    const address = server.address();
    if (!address || typeof address === 'string') { reject(new Error('Invalid server address')); return; }
    config.listen.port = address.port;
-   app = createApp({ config, gateway, orchestrator, csrfToken, logger, appVersion: '0.1.0', staticRoot: fileURLToPath(new URL('../../web',import.meta.url)) });
+   app = createApp({ config, gateway, orchestrator, approvalDetector: createApprovalDetector('task'), csrfToken, logger, appVersion: '0.1.0', staticRoot: fileURLToPath(new URL('../../web',import.meta.url)) });
    resolve(address.port);
   });
  });

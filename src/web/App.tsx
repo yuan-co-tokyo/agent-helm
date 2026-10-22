@@ -7,6 +7,7 @@ import { Header } from './components/Header.js';
 import { AttentionPanel } from './components/AttentionPanel.js';
 import { OrchestratorConsole } from './components/OrchestratorConsole.js';
 import { TaskList } from './components/TaskList.js';
+import { ApprovalPanel } from './components/ApprovalPanel.js';
 import { TaskDetail } from './components/TaskDetail.js';
 const defaultApi = { apiGet, getSession };
 export function App({ api = defaultApi }: { api?: typeof defaultApi }) {
@@ -36,10 +37,10 @@ export function App({ api = defaultApi }: { api?: typeof defaultApi }) {
   api.getSession().then(value => { if (active) setSession(value); }).catch(() => { if (active) setError('サーバーに接続できません'); });
   return () => { active = false; };
  },[api]);
- return <><Header session={session} sessionError={error} state={state.data} connected={state.connected} lastSuccessAt={state.lastSuccessAt} mock={mock} /><main data-tab={tab}>
+ return <><Header session={session} sessionError={error} state={state.data} connected={state.connected && state.data?.agtx.reachable !== false} lastSuccessAt={state.lastSuccessAt} mock={mock} /><main data-tab={tab}>
  <div className="attention-section"><AttentionPanel items={state.data?.attention ?? null} stale={!!state.error} onSelect={target => { if (target.kind === 'task') setSelectedTaskId(target.taskId); else { setTab('console'); consoleRef.current?.focus(); } }} /></div>
  <div className="columns"><div className="console-section" ref={consoleRef} tabIndex={-1}><OrchestratorConsole session={session} status={state.data?.orchestrator} /></div><div className="tasks-section"><TaskList tasks={state.data?.tasks ?? null} stale={!!state.error} selectedId={selectedTaskId} onSelect={setSelectedTaskId} /></div></div>
- <TaskDetail taskId={selectedTaskId} detail={detail.data} summary={state.data?.tasks.find(task => task.id === selectedTaskId)} connected={detail.connected} lastSuccessAt={detail.lastSuccessAt} error={detail.error} onClose={() => setSelectedTaskId(null)} />
+ <TaskDetail renderApproval={target => <ApprovalPanel target={target} projectName={session?.target.project.name} />} taskId={selectedTaskId} detail={detail.data} summary={state.data?.tasks.find(task => task.id === selectedTaskId)} connected={detail.connected} lastSuccessAt={detail.lastSuccessAt} error={detail.error} onClose={() => setSelectedTaskId(null)} />
  <nav className="bottom-tabs" aria-label="表示切替">{[['attention','要対応'],['console','コンソール'],['tasks','タスク']].map(([key,label]) => <button key={key} aria-pressed={tab === key} onClick={() => setTab(key!)}>{label}</button>)}</nav>
  </main></>;
 }

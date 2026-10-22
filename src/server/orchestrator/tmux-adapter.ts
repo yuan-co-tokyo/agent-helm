@@ -1,3 +1,4 @@
+import { createApprovalDetector } from '../approval/adapter.js';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { ORCHESTRATOR_KEYS, type OrchestratorKey, type OrchestratorTarget, type SendResult } from '../../shared/api.js';
@@ -6,7 +7,7 @@ import { clampLines } from '../agtx/schemas.js';
 import { stripAnsi } from '../text.js';
 import { ExecFileTmuxRunner, type TmuxRunner } from '../tmux/exec.js';
 import { resolvePane } from '../tmux/target.js';
-import { assessInputReady, simpleApprovalDetector, type ApprovalDetector } from '../tmux/input-ready.js';
+import { assessInputReady, type ApprovalDetector } from '../tmux/input-ready.js';
 import { OrchestratorError, type OrchestratorAdapter } from './types.js';
 import { validateInstruction } from './validate.js';
 type Result = Omit<SendResult,'requestId'>;
@@ -18,7 +19,7 @@ export class TmuxOrchestratorAdapter implements OrchestratorAdapter {
  constructor(target: OrchestratorTarget, private opts: { runner?: TmuxRunner; detector?: ApprovalDetector; maxChars?: number; settleMs?: number; timeoutMs?: number } = {}) {
   this.target = { ...target };
   this.runner = opts.runner ?? new ExecFileTmuxRunner(target.socket,{ timeoutMs: opts.timeoutMs });
-  this.detector = opts.detector ?? simpleApprovalDetector;
+  this.detector = opts.detector ?? createApprovalDetector('orchestrator');
  }
  describeTarget() { return { ...this.target }; }
  private resolve() { return resolvePane(this.runner,this.target.session,this.target.window); }

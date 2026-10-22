@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { ApprovalPrompt, InputReady } from '../../shared/api.js';
-export interface ApprovalDetector { detect(text: string, capturedAt: string): ApprovalPrompt | null }
+import type { ApprovalDetector } from '../status/types.js';
+export type { ApprovalDetector } from '../status/types.js';
 const approvalPattern = /Do you want to|Would you like to|Allow .*\?|\[y\/n\]|\(yes\/no\)/i;
 const promptPattern = /^\s*[│ ]*[❯›]/;
 const numbered = /^\s*\d+\.\s/;

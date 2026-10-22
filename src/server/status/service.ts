@@ -1,3 +1,4 @@
+import { tailLines } from '../approval/normalize.js';
 import type { AgtxStatus, ApprovalPrompt, OrchestratorStatus, StateResponse, TaskDetailView, TaskView } from '../../shared/api.js';
 import { GatewayError } from '../agtx/types.js';
 import type { AgtxGateway, TaskDetail, TaskSummary } from '../agtx/types.js';
@@ -54,8 +55,8 @@ export class StatusService {
     let approval: ApprovalPrompt | null = null;
     if (needsPaneCheck(task, this.deps.detector)) {
      try {
-      const pane = await this.deps.gateway.readPane(task.id, 40);
-      approval = this.deps.detector!.detect(pane.text.split('\n').slice(-40).join('\n'), pane.capturedAt);
+      const pane = await this.deps.gateway.readPane(task.id, 200);
+      approval = this.deps.detector!.detect(tailLines(pane.text).join('\n'), pane.capturedAt, task.agent);
      } catch { /* Detection and pane failure are not approval evidence. */ }
     }
     const view = await this.toTaskView(task, approval, agtx.tuiConnected, false);
@@ -85,7 +86,7 @@ export class StatusService {
   try { pane = await this.deps.gateway.readPane(id, 200); }
   catch (error) { paneError = gatewayErrorToResponse(gatewayError(error)).body.error; }
   if (pane && this.deps.detector && needsApprovalCheck(task)) {
-   try { approval = this.deps.detector.detect(pane.text.split('\n').slice(-40).join('\n'), pane.capturedAt); } catch { /* Leave approval null. */ }
+   try { approval = this.deps.detector.detect(tailLines(pane.text).join('\n'), pane.capturedAt, task.agent); } catch { /* Leave approval null. */ }
   }
   return { ...await this.toTaskView(task, approval, this.deps.gateway.lastHealth?.tuiConnected ?? null, true),
    description: task.description, worktreePath: task.worktreePath, sessionName: task.sessionName, baseBranch: task.baseBranch,
