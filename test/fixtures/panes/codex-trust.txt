@@ -1,0 +1,6 @@
+Trust this folder and allow the agent to read and change files in
+this directory?
+
+› 1. Yes, proceed (y)
+  2. No, exit (esc)
+enter continue · esc quit

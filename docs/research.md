@@ -82,3 +82,26 @@
 3. trust ダイアログの表示形式
 4. Running→Review 遷移時の PR 自動作成の有無
 5. Orchestrator ペインへ bracketed paste で日本語・改行を送ったときの挙動
+
+## 8. T6 実機再確認（2026-10-22）
+
+- agtx **1.0.6** / Claude Code **2.1.307** / Codex CLI **0.156.1** / tmux **3.7b** / Node **26.5.0** / pnpm **10.19.0** を実測。既存 serve は **127.0.0.1:8799**。前節の 2.1.306 は前日の調査値。
+- `/pane` 成功は **`{session_name: string, lines: number, content: string}`**。7 active タスクで HTTP 200、1 ペインには ANSI が含まれた。Gateway は `content` を取り出し ANSI を除去する。4 節以前の「成功形式未確認」は解消。
+- `/tasks/{id}` の `referenced_tasks` は **null またはカンマ区切り UUID 文字列**。7 件で確認。配列と仮定した初期スキーマは `bad_response` になったため、null→[]、文字列→trim/split、配列→維持で正規化した。
+- T6 が実行中にもかかわらず一覧は **`phase_status=exited`**、詳細は **`agent_state=ended`**、ペインは取得可能だった。CLI の終了判定と実画面は一致しない場合がある。exited/null の active タスクのペイン走査を維持する。
+- 一覧と詳細は別リクエストであり、同一時刻の原子的 snapshot ではない。今回の再確認で更新遅延の秒数までは測定していない。list のフェーズだけで完了判定せず、active な不明/終了表示は getTask・ペインと照合する。
+- 実 `/input` 成功本文は引き続き**未確認**。本番への POST は行っていない。Gateway は現状、読み取りまで完了した 2xx を sent とする。再現手順と範囲は [検証記録](verification.md) 参照。
+
+### 承認画面の実測
+
+- Claude 2.1.307: `Bash command`、説明、`ls`、権限ルール説明の後に `Do you want to proceed?` と **1 Yes / 2 No**。既存の推定 3 選択肢とは異なる。質問より上のコマンドも指紋へ含める修正を行った。Web から 2 を送り、`Interrupted · What should Claude do instead?` を確認。
+- Claude の通常 manual モードでも `ls` は確認なしで実行された。検証セッションの `permissions.ask=["Bash(*)"]` を追加すると確認画面が出た。グローバルの権限ルールは変更していない。
+- Claude trust: 番号なしの `No, exit` / `Yes, I trust this folder`（初期選択は拒否）。従来の numbered detector は対応しない。Web から推測キーを送らず端末で確認する。
+- Codex 0.156.1: `Would you like to run the following command?`、`Environment: local`、`Reason: ...`、`$ ls`、**1 Yes, proceed (y) / 2 Yes, and don't ask again ... (p) / 3 No, and tell Codex ... (esc)**。実画面を取得し Escape で拒否。
+- Codex trust: `Folder access`、`Trust this folder?` の説明、1 Trust and continue / 2 Quit。実フィクスチャを保存。
+- `Approaching rate limits / Switch to …?` はモデル切替メニューで、実行許可ではない。回帰テストで承認検出 null、入力拒否 `menu_open` を確認（この文面のフィクスチャは合成、今回実機でレート制限は発生させていない）。
+- 既存調査で Orchestrator の permissions bypass を確認済み。planning/review の Claude も起動設定によって bypass になるため、通常の承認を必ず表示するとは限らない。今回これらの本番セッションには入力せず、専用 manual セッションで確認した。
+
+### CLI の注意
+
+この環境では `agtx --help` がヘルプではなく TUI を起動した（非 TTY では `Device not configured`）。作業ディレクトリをプロジェクトへ自動登録する副作用があった。T6 ワークツリーの登録を追加した状態で TUI を終了している。CLI 調査でもこの操作を読み取り専用とはみなさないこと。
