@@ -89,3 +89,11 @@ it.each([12,13])('bounds command lookback at %s lines',distance=> {
  expect(raw.detail?.includes('old cmd') ?? false).toBe(distance===12);
  expect(detect(text.replace('old cmd','changed'))?.fingerprint===raw.fingerprint).toBe(distance!==12);
 });
+
+it('distinguishes trust selection from immediate exec confirmation without changing fingerprints',()=> {
+ const text = fixture('codex-trust.real');
+ const raw = detect(text)!;
+ expect(raw).toMatchObject({confirm:'enter',selected:'1',kind:'trust'});
+ expect(detect(text.replace('› 1.','  1.').replace('  2.','› 2.'))).toMatchObject({confirm:'enter',selected:'2',fingerprint:raw.fingerprint});
+ expect(detect(fixture('codex-exec-approval.real'))).toMatchObject({confirm:'key'});
+});

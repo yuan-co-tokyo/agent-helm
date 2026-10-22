@@ -20,3 +20,9 @@ describe('web labels and text safety', () => {
   expect(stripControl('\u001b[31mred\u001b[0m\nnext')).toBe('red\nnext');
  });
 });
+it('translates all known input reasons and provides a fallback',async()=> {
+ const {INPUT_BLOCK_REASONS,inputBlockReason} = await import('../../src/web/state/labels.js');
+ for (const code of Object.keys(INPUT_BLOCK_REASONS)) expect(inputBlockReason(code)).not.toContain(code);
+ expect(inputBlockReason('future')).toBe('送信できない状態です（コード: future）');
+ expect(DISPLAY_STATE_LABELS.awaiting_input.label).toBe('入力待ち（完了確認待ち）');
+});

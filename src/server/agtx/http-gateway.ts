@@ -76,7 +76,11 @@ export class HttpAgtxGateway implements AgtxGateway {
    const kind = e instanceof GatewayError ? e.kind : 'unknown';
    return { outcome: ['project_not_found','project_ambiguous','not_found'].includes(kind) ? 'rejected' : 'unknown', reason: kind };
   }
-  try { await this.request('POST',path + '/input',{ key }); return { outcome: 'sent' }; }
+  try {
+   const body = z.object({ delivered: z.boolean() }).safeParse(await this.request('POST',path + '/input',{ key }));
+   if (!body.success) return { outcome: 'unknown', reason: 'bad_response' };
+   return body.data.delivered ? { outcome: 'sent' } : { outcome: 'rejected', reason: 'not_delivered' };
+  }
   catch (e) {
    const err = e instanceof GatewayError ? e : new GatewayError('unknown');
    return { outcome: err.status && err.status >= 400 && err.status < 500 ? 'rejected' : 'unknown', reason: err.kind };

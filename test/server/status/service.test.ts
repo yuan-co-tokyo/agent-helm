@@ -73,3 +73,23 @@ it('only supplies the last forty lines to detail approval detection', async () =
  expect(detail.pane?.lines).toBe(200); expect(detect.mock.calls[0]?.[0].split('\n')).toHaveLength(40);
  expect(detect.mock.calls[0]?.[0].split('\n')[0]).toBe('160');
 });
+
+it('does not retain a connected TUI after health fails',async ()=> {
+ const {gateway,service} = setup();
+ expect((await service.getState()).agtx.tuiConnected).toBe(true);
+ gateway.failNext('getHealth',new GatewayError('unreachable'));
+ expect((await service.getState()).agtx).toMatchObject({reachable:false,tuiConnected:null});
+});
+it.each(['codex','claude',null])('classifies exited input for %s in list and detail',async agent=> {
+ const {gateway,service,detect} = setup(); detect.mockReturnValue(null);
+ gateway.setTasks([task({agent,phaseStatus:'exited'})]);
+ gateway.setPane(task().id,agent==='claude' ? '❯ ' : '› Ask Codex to do anything');
+ const expected = agent ? 'awaiting_input' : 'error';
+ const state = await service.getState(); expect(state.tasks[0]?.displayState).toBe(expected);
+ expect((await service.getTaskDetail(task().id)).displayState).toBe(expected);
+ if (agent) expect(state.attention).toEqual([]);
+ gateway.failNext('readPane',new GatewayError('timeout'));
+ expect((await service.getState()).tasks[0]?.displayState).toBe('error');
+ gateway.failNext('readPane',new GatewayError('timeout'));
+ expect((await service.getTaskDetail(task().id)).displayState).toBe('error');
+});

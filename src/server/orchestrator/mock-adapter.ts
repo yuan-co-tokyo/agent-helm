@@ -11,6 +11,7 @@ export class MockOrchestratorAdapter implements OrchestratorAdapter {
  text = '';
  inputReady: InputReady = { ok: false, reason: 'not_implemented' };
  instructions: string[] = [];
+ onKey?: (key: OrchestratorKey) => void;
  keys: OrchestratorKey[] = [];
  constructor(target: OrchestratorTarget = { socket: 'agent-helm-test', session: 'test', window: 'orchestrator' }) {
   this.status = { state: 'error', target, paneId: null, currentCommand: null, reason: 'not_implemented', checkedAt: new Date().toISOString() };
@@ -31,6 +32,6 @@ export class MockOrchestratorAdapter implements OrchestratorAdapter {
  async sendKey(key: OrchestratorKey): Promise<Omit<SendResult,'requestId'>> {
   if (!(ORCHESTRATOR_KEYS as readonly string[]).includes(key)) return { outcome: 'rejected', reason: 'key_not_allowed' };
   if (this.status.state !== 'running') return { outcome: 'rejected', reason: 'not_ready' };
-  this.keys.push(key); return { outcome: 'sent' };
+  this.keys.push(key); this.onKey?.(key); return { outcome: 'sent' };
  }
 }

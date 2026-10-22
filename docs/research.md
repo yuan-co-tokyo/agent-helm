@@ -90,7 +90,7 @@
 - `/tasks/{id}` の `referenced_tasks` は **null またはカンマ区切り UUID 文字列**。7 件で確認。配列と仮定した初期スキーマは `bad_response` になったため、null→[]、文字列→trim/split、配列→維持で正規化した。
 - T6 が実行中にもかかわらず一覧は **`phase_status=exited`**、詳細は **`agent_state=ended`**、ペインは取得可能だった。CLI の終了判定と実画面は一致しない場合がある。exited/null の active タスクのペイン走査を維持する。
 - 一覧と詳細は別リクエストであり、同一時刻の原子的 snapshot ではない。今回の再確認で更新遅延の秒数までは測定していない。list のフェーズだけで完了判定せず、active な不明/終了表示は getTask・ペインと照合する。
-- 実 `/input` 成功本文は引き続き**未確認**。本番への POST は行っていない。Gateway は現状、読み取りまで完了した 2xx を sent とする。再現手順と範囲は [検証記録](verification.md) 参照。
+- この時点の実 `/input` 成功本文未確認は、T8（次節）で解消。再現範囲は [検証記録](verification.md) 参照。
 
 ### 承認画面の実測
 
@@ -105,3 +105,16 @@
 ### CLI の注意
 
 この環境では `agtx --help` がヘルプではなく TUI を起動した（非 TTY では `Device not configured`）。作業ディレクトリをプロジェクトへ自動登録する副作用があった。T6 ワークツリーの登録を追加した状態で TUI を終了している。CLI 調査でもこの操作を読み取り専用とはみなさないこと。
+
+## 9. T8 実機検証（2026-10-22）
+
+承認済み T8 計画の実測記録。使い捨て `agent-helm-verify`（検証後削除）、agtx 1.0.6 / Codex 0.156.1。
+
+- `/input` は HTTP 200 / `{"delivered":true}`。キー配送を示し、承認の受理は示さない。Web から exec の `3` 拒否・`1` 許可を確認。
+- Codex trust は数字でカーソルが移動するだけで、`enter continue · esc quit` の Enter が確定操作。exec の `Press enter to confirm or esc to cancel` は数字だけで即確定した。
+- serve 停止時に到達不可になっても `tuiConnected` の前回値が残っていた。health 失敗時は null（不明）へ変更。
+- agtx の exited と実際の入力待ち画面が一致しないケースがあった。Codex / Claude の入力プロンプトが残る exited は「入力待ち（完了確認待ち）」とし、エラーの要対応から除外。
+- 起動順は Claude → `/exit` → Codex。auto_trust=false の初回リポジトリでは Claude の trust に `/exit` が入り、Codex が起動しない事例があった。事前に両 CLI でリポジトリを信頼する必要がある。
+- 利用者から入力できない理由が分からないとの報告。`input_not_empty` 等を日本語化し、入力欄のプレースホルダーでも検出されることを明記。
+
+今回の実装では数字後の指紋・カーソルを確認した場合だけ Enter を送る。同じ承認が残ると sent_unconfirmed、選択確認に失敗すると Enter を送らず unknown。修正後は実画面フィクスチャ＋モックで検証し、実 agtx や本番 Orchestrator へは送信していない。
