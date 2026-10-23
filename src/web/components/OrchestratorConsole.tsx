@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import type { OrchestratorScreenResponse, OrchestratorStatus, SendResult, SessionResponse } from '../../shared/api.js';
 import { DEFAULT_INSTRUCTION_MAX_CHARS } from '../../shared/constants.js';
+import { projectPath } from '../api/paths.js';
 import { apiGet, apiPost } from '../api/client.js';
 import { usePaneScreenPolling } from '../hooks/usePaneScreenPolling.js';
 import { useStickToBottom } from '../hooks/useStickToBottom.js';
@@ -8,35 +9,35 @@ import { classifySendError, countChars, formatTime, fromResult, sendMessage, typ
 import { inputBlockReason } from '../state/labels.js';
 import { ApprovalPanel } from './ApprovalPanel.js';
 import './console-approval.css';
-export interface OrchestratorConsoleProps { session:SessionResponse|null; status?:OrchestratorStatus|null; maxChars?:number }
-export function OrchestratorConsole({session,status,maxChars=DEFAULT_INSTRUCTION_MAX_CHARS}:OrchestratorConsoleProps) {
- const fetcher = useCallback(()=>apiGet<OrchestratorScreenResponse>('/api/orchestrator/screen'),[]);
+export interface OrchestratorConsoleProps { project:{id:string;name:string}; session:SessionResponse|null; status?:OrchestratorStatus|null; maxChars?:number }
+export function OrchestratorConsole({project,session,status,maxChars=DEFAULT_INSTRUCTION_MAX_CHARS}:OrchestratorConsoleProps) {
+ const fetcher = useCallback(()=>apiGet<OrchestratorScreenResponse>(projectPath(project.id,'orchestrator','screen')),[project.id]);
  const screen = usePaneScreenPolling(fetcher);
  const {ref:screenRef,onScroll,pinned,jump} = useStickToBottom(screen.data?.text ?? '');
  const [text,setText] = useState('');
  const [state,setState] = useState<SendState>({kind:'idle'});
  const inFlight = useRef(false);
- const target = session?.target.orchestrator;
+ const target = status?.target;
  const ready = !!session && !!screen.data?.inputReady.ok && !screen.stale && !!text.trim() && countChars(text)<=maxChars && state.kind !== 'sending';
  async function send() {
   if (!ready || inFlight.current) return;
   if (!globalThis.crypto?.randomUUID) { setState({kind:'rejected',reason:'安全な requestId を生成できません'}); return; }
   inFlight.current = true; setState({kind:'sending'});
   try {
-   const result = fromResult(await apiPost<SendResult>('/api/orchestrator/instructions',{text,requestId:crypto.randomUUID()}));
+   const result = fromResult(await apiPost<SendResult>(projectPath(project.id,'orchestrator','instructions'),{projectId:project.id,text,requestId:crypto.randomUUID()}));
    setState(result);
    if (result.kind === 'sent' || result.kind === 'sent_unconfirmed') { setText(''); screen.refresh(); }
   } catch(error) { setState(classifySendError(error)); }
   finally { inFlight.current = false; }
  }
  return <section className="helm-console" aria-label="Orchestrator コンソール"><span className="eyebrow">COMMUNICATION</span><h2>Orchestrator コンソール</h2>
-  <p className="console-meta">プロジェクト: {session?.target.project.name ?? '未取得'} / 送信先: {target ? `${target.socket} / ${target.session}:${target.window}` : '未取得'} / ペイン: {status?.paneId ?? '未取得'}</p>
+  <p className="console-meta">プロジェクト: {project.name} / 送信先: {target ? `${target.socket} / ${target.session}:${target.window}` : '未取得'} / ペイン: {status?.paneId ?? '未取得'}</p>
   <p>状態: {status?.state ?? '未取得'} {status?.reason && inputBlockReason(status.reason)}</p>
   <p>{screen.stale ? '切断中・古い画面・最終取得 ' : '最終取得 '}{screen.lastSuccessAt ? formatTime(screen.lastSuccessAt) : '未取得'}</p>
   <div className="terminal-panel"><div className="terminal-heading" aria-hidden="true">● ● ● <span>ORCHESTRATOR</span></div><pre ref={screenRef} onScroll={onScroll}>{screen.data?.text ?? '画面を取得中…'}</pre>
   {!pinned && <button className="jump-latest" onClick={jump}>最新へ ↓</button>}</div>
   {/* Keep the panel mounted so parent polling cannot discard a confirmation or unknown outcome. */}
-  <ApprovalPanel screen={screen} target={{kind:'orchestrator'}} projectName={session?.target.project.name} />
+  <ApprovalPanel screen={screen} target={{kind:'orchestrator'}} project={project} />
   <div className="send-reasons">
   {!screen.data?.inputReady.ok && <p>送信できない理由: {screen.data?.inputReady.reason ? inputBlockReason(screen.data.inputReady.reason) : '画面を取得するまで送信できません'}</p>}
   {!text.trim() && <p>指示を入力してください</p>}

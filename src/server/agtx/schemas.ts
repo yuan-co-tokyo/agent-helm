@@ -7,7 +7,7 @@ const nullableText = z.string().nullable().optional().transform(v => v ?? null);
 const nullableNumber = z.number().nullable().optional().transform(v => v ?? null);
 const nullableBool = z.boolean().nullable().optional().transform(v => v ?? null);
 const strings = z.array(z.string()).optional().default([]);
-export const projectSchema = z.object({ id: z.string().refine(isUuid), name: z.string(), path: nullableText }).transform(v => ({ id: v.id, name: v.name, path: v.path }));
+export const projectSchema = z.object({ id: z.string().refine(isUuid), name: z.string(), path: nullableText, tui_connected: nullableBool, last_opened: nullableText }).transform(v => ({ id: v.id, name: v.name, path: v.path, tuiConnected: v.tui_connected, lastOpened: v.last_opened }));
 export const healthSchema = z.object({ version: z.string(), mode: nullableText, project_count: nullableNumber, tui_connected: nullableBool });
 const summaryFields = {
  id: z.string().refine(isUuid), title: z.string(), status: z.enum(TASK_STATUSES),

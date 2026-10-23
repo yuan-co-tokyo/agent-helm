@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { AgtxKey } from '../../shared/api.js';
 import { SUPPORTED_AGTX_VERSION } from '../../shared/constants.js';
-import { isLoopbackUrl } from '../config.js';
+import { HttpClient } from './http-client.js';
 import type { Logger } from '../log.js';
 import type { AgtxPane } from './types.js';
 import { stripAnsi, stripFaint } from '../text.js';
@@ -13,43 +13,23 @@ export class HttpAgtxGateway implements AgtxGateway {
  cachedProject: ProjectRef | null = null;
  lastHealth: AgtxHealth | null = null;
  private projectFetchedAt = 0;
- private readonly fetcher: typeof fetch;
+ private readonly client: HttpClient;
  private readonly now: () => number;
- constructor(private readonly options: { baseUrl: string; projectName: string; timeoutMs: number; fetch?: typeof fetch; now?: () => number }) {
-  if (!isLoopbackUrl(options.baseUrl)) throw new Error('agtx.baseUrl must be a loopback HTTP root URL');
-  this.fetcher = options.fetch ?? fetch; this.now = options.now ?? Date.now;
+ constructor(private readonly options: { baseUrl: string; projectName?: string; projectId?: string; timeoutMs: number; fetch?: typeof fetch; now?: () => number }) {
+  this.client = new HttpClient(options); this.now = options.now ?? Date.now;
  }
- private async request(method: 'GET'|'POST', path: string, body?: object): Promise<unknown> {
-  try {
-   const response = await this.fetcher(this.options.baseUrl.replace(/\/$/,'') + path, {
-    method, redirect: 'error', signal: AbortSignal.timeout(this.options.timeoutMs),
-    ...(body ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {})
-   });
-   if (!response.ok) {
-    await response.body?.cancel();
-    if (response.status === 404) this.cachedProject = null;
-    throw new GatewayError(response.status === 404 ? 'not_found' : response.status === 409 ? 'conflict' : 'unknown',response.status);
-   }
-   // Read the entire response before declaring an input sent; read failures are ambiguous.
-   const text = await response.text();
-   if (method === 'POST' && !text.trim()) return null;
-   try { return JSON.parse(text) as unknown; } catch { throw new GatewayError('bad_response'); }
-  } catch (e) {
-   if (e instanceof GatewayError) throw e;
-   if (e instanceof Error && ['TimeoutError','AbortError'].includes(e.name)) throw new GatewayError('timeout');
-   throw new GatewayError('unreachable');
-  }
- }
+ private async request(method: 'GET'|'POST', path: string, body?: object) { try { return await this.client.request(method,path,body); } catch (e) { if (e instanceof GatewayError && e.status === 404) this.cachedProject = null; throw e; } }
+ async listProjects() { return parseResponse(z.array(projectSchema),await this.request('GET','/api/projects')); }
  async getHealth() {
   const v = parseResponse(healthSchema, await this.request('GET','/api/health'));
   this.lastHealth = { version: v.version, mode: v.mode, projectCount: v.project_count, tuiConnected: v.tui_connected, fetchedAt: new Date(this.now()).toISOString() };
   return this.lastHealth;
  }
  async resolveProject() {
-  if (this.cachedProject && this.now() - this.projectFetchedAt < 60000) return this.cachedProject;
+  if (!this.options.projectId && this.cachedProject && this.now() - this.projectFetchedAt < 60000) return this.cachedProject;
   this.cachedProject = null;
-  const projects = parseResponse(z.array(projectSchema),await this.request('GET','/api/projects'));
-  const matches = projects.filter(p => p.name === this.options.projectName);
+  const projects = await this.listProjects();
+  const matches = projects.filter(p => this.options.projectId ? p.id === this.options.projectId : p.name === this.options.projectName);
   if (!matches.length) throw new GatewayError('project_not_found');
   if (matches.length !== 1) throw new GatewayError('project_ambiguous');
   this.cachedProject = matches[0]!;

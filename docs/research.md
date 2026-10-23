@@ -132,3 +132,16 @@
 - T10 マージ前の本番読み取り専用確認では、T0〜T9 完了、#2 / #3 / #4 / #9 / #10 / #11 / #12 は MERGED、#5〜#7 はクローズ（#9 で統合）。T6 では CLOSED #8 より MERGED #9 が選ばれ、MERGED 優先の実例を確認した。テスト結果は未取得表示のまま。
 
 本番タスク・本番 Orchestrator への送信は行っていない。実測の詳細・受け入れ条件の判定と残件は [検証記録](verification.md) を参照。
+
+
+## 11. T12 グローバルモードの実測（2026-10-24）
+
+Orchestrator から提供された読み取り専用の確認結果。agtx 1.0.6 をパス無しの `agtx serve --host 127.0.0.1 --port <port>` で起動した場合、health は `{"version":"1.0.6","mode":"global","project_count":6,"tui_connected":true}`。`/api/projects` は `{id(UUID),name,path,last_opened,tui_connected(bool)}` の配列で、`/api/projects/{pid}/tasks` は200。
+
+プロジェクトごとの TUI は true/false が混在する。bonsight、agent-helm、agtx-playground は接続、agent-helm-verify、agent-helm-verify2、e7a11c9c-T6-統合検証-README-実機確認は未接続。削除済みパスの登録も一覧に残る。global health の true を全プロジェクトへ流用せず、カードと詳細は各プロジェクトの値を使う必要がある。
+
+`tmux -L agtx` のセッションは agent-helm / agtx-playground / bonsight。各 orchestrator ウィンドウは名前 `orchestrator`、単一ペインだが番号は1/3/2と異なるため名前で解決する。
+
+非 ASCII の実例では `e7a11c9c-T6-統合検証-README-実機確認` に対しセッション名は `e7a11c9c-T6---README` だった。変換規則は未確定なので推測せず、明示設定で対応する。tmux 自身の `.` / `:` → `_` 以外の agtx 独自変換は未確認。衝突を検出した送信先は双方を無効化する。
+
+このタスクの送信検証はモック agtx と隔離 tmux のみで行い、実プロジェクトには送信していない。

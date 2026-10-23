@@ -12,8 +12,8 @@ function setup(kind: 'task'|'orchestrator' = 'task', pane = text) {
  const ctx = makeApp({ approval: { settleMs: 0, sendTimeoutMs: 10 } });
  ctx.gateway.tasks = [detailSchema.parse(taskFixture)]; ctx.gateway.setPane(TASK_ID,pane);
  ctx.orchestrator.status.state = 'running'; ctx.orchestrator.text = pane;
- const body: ApprovalRespondRequest = { target: kind === 'task' ? { kind, taskId: TASK_ID } : { kind }, fingerprint: detectApproval(pane,{ capturedAt: '' })!.fingerprint, key: '1', requestId: randomUUID() };
- const post = (value: unknown = body) => ctx.app.request('/api/approvals/respond',{ method: 'POST', headers, body: JSON.stringify(value) });
+ const body: ApprovalRespondRequest = { projectId: "11111111-1111-4111-8111-111111111111", target: kind === 'task' ? { kind, taskId: TASK_ID } : { kind }, fingerprint: detectApproval(pane,{ capturedAt: '' })!.fingerprint, key: '1', requestId: randomUUID() };
+ const post = (value: unknown = body) => ctx.app.request('/api/projects/11111111-1111-4111-8111-111111111111/approvals/respond',{ method: 'POST', headers, body: JSON.stringify(value) });
  return { ...ctx, body, post };
 }
 it.each(['task','orchestrator'] as const)('sends once to %s and returns the refreshed pane',async kind => {
@@ -62,7 +62,7 @@ it.each([{}, { key: '' },{ key: 'a'.repeat(17) },{ fingerprint: 'bad' },{ target
  expect(response.status).toBe(400); expect(ctx.gateway.sentKeys).toHaveLength(0);
 });
 it('rejects malformed JSON',async () => {
- const ctx = setup(); expect((await ctx.app.request('/api/approvals/respond',{ method: 'POST', headers, body: '{' })).status).toBe(400);
+ const ctx = setup(); expect((await ctx.app.request('/api/projects/11111111-1111-4111-8111-111111111111/approvals/respond',{ method: 'POST', headers, body: '{' })).status).toBe(400);
 });
 it.each(['claude-edit-four-options.estimated','generic-yesno'])('rejects unsendable options in %s',async name => {
  const ctx = setup('task',readFileSync('test/fixtures/panes/' + name + '.txt','utf8')); ctx.body.key = name.startsWith('claude') ? '4' : 'y';

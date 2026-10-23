@@ -10,10 +10,10 @@ it.each(['exited', null] as const)('detects real Claude approval with phase %s a
  gateway.setTasks([current]);
  const text = readFileSync('test/fixtures/panes/claude-bash-approval.real.txt', 'utf8');
  gateway.setPane(current.id, text + '\n'.repeat(60));
- expect(await (await app.request('/api/state', { headers })).json()).toMatchObject({ tasks: [{ displayState: 'approval' }], attention: [{ kind: 'approval' }] });
- const detail = await (await app.request('/api/tasks/' + current.id, { headers })).json();
- const body = { target: { kind: 'task', taskId: current.id }, fingerprint: detail.approval.fingerprint, key: '2', requestId: randomUUID() };
- const post = () => app.request('/api/approvals/respond', { method: 'POST', headers, body: JSON.stringify(body) });
+ expect(await (await app.request('/api/projects/11111111-1111-4111-8111-111111111111/state', { headers })).json()).toMatchObject({ tasks: [{ displayState: 'approval' }], attention: [{ kind: 'approval' }] });
+ const detail = await (await app.request('/api/projects/11111111-1111-4111-8111-111111111111/tasks/' + current.id, { headers })).json();
+ const body = { projectId: "11111111-1111-4111-8111-111111111111", target: { kind: 'task', taskId: current.id }, fingerprint: detail.approval.fingerprint, key: '2', requestId: randomUUID() };
+ const post = () => app.request('/api/projects/11111111-1111-4111-8111-111111111111/approvals/respond', { method: 'POST', headers, body: JSON.stringify(body) });
  gateway.setPane(current.id, text.replace(' ls\n', ' pwd\n'));
  expect((await post()).status).toBe(409);
  expect(gateway.sentKeys).toEqual([]);

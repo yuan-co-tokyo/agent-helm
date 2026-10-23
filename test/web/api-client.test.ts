@@ -7,8 +7,8 @@ it('attaches CSRF and JSON headers; refreshes once without replaying POST',async
   if (url === '/api/session') return Response.json({ csrfToken: 'token' });
   return Response.json({ error: { code: 'csrf_invalid', message: 'invalid' } },{ status: 403 });
  });
- await expect(client.apiPost('/api/approvals/respond',{ key: 'y' })).rejects.toMatchObject({ status: 403, code: 'csrf_invalid' });
- expect(calls.map(c => c.path)).toEqual(['/api/session','/api/approvals/respond','/api/session']);
+ await expect(client.apiPost('/api/projects/11111111-1111-4111-8111-111111111111/approvals/respond',{ key: 'y' })).rejects.toMatchObject({ status: 403, code: 'csrf_invalid' });
+ expect(calls.map(c => c.path)).toEqual(['/api/session','/api/projects/11111111-1111-4111-8111-111111111111/approvals/respond','/api/session']);
  expect(calls[1]?.init).toMatchObject({ method: 'POST', headers: { 'Content-Type': 'application/json', 'x-helm-csrf': 'token' }, credentials: 'same-origin', cache: 'no-store' });
 });
 it('does not refresh for unrelated forbidden errors',async () => {

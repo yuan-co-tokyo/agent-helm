@@ -123,3 +123,17 @@ it('normalizes refused connections and never retries input',async () => {
  await expect(gateway.getHealth()).rejects.toMatchObject({ kind: 'unreachable' });
  expect(await gateway.sendKey(TASK_ID,'y')).toEqual({ outcome: 'unknown', reason: 'unreachable' });
 });
+
+it('binds identical task IDs to the selected project UUID and detects removal', async () => {
+ const mock = await startMockAgtx({ multiProject: true });
+ const id = '33333333-3333-4333-8333-333333333333';
+ const gateway = new HttpAgtxGateway({ baseUrl: mock.url, projectId: id, timeoutMs: 500 });
+ try {
+  expect((await gateway.getTask(TASK_ID)).title).toBe('Playground task');
+  expect(await gateway.sendKey(TASK_ID,'1')).toMatchObject({ outcome: 'sent' });
+  expect(mock.requests.at(-1)?.path).toBe(`/api/projects/${id}/tasks/${TASK_ID}/input`);
+  mock.state.projects = [projectFixture];
+  expect(await gateway.sendKey(TASK_ID,'1')).toMatchObject({ outcome: 'rejected', reason: 'project_not_found' });
+  expect(mock.requests.filter(r => r.method === 'POST')).toHaveLength(1);
+ } finally { await mock.close(); }
+});

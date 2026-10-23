@@ -4,23 +4,24 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createApp } from './app.js';
 import { assertLoopbackListen, loadConfig } from './config.js';
 import type { HelmConfig } from './config.js';
-import { HttpAgtxGateway, checkAgtxVersion } from './agtx/http-gateway.js';
+import { checkAgtxVersion } from './agtx/http-gateway.js';
 import type { AgtxGateway } from './agtx/types.js';
 import type { OrchestratorAdapter } from './orchestrator/types.js';
-import { TmuxOrchestratorAdapter } from './orchestrator/tmux-adapter.js';
+import { HttpAgtxDirectory, MockAgtxDirectory } from './agtx/directory.js';
+import { ProjectRegistry } from './projects/registry.js';
 import { createLogger } from './log.js';
 import { generateCsrfToken } from './security.js';
 export async function startServer(opts: { config?: HelmConfig; env?: NodeJS.ProcessEnv; gateway?: AgtxGateway; orchestrator?: OrchestratorAdapter } = {}) {
  const config = structuredClone(opts.config ?? loadConfig({ env: opts.env }));
  assertLoopbackListen(config.listen.host);
  const logger = createLogger();
- const gateway = opts.gateway ?? new HttpAgtxGateway(config.agtx);
- const orchestrator = opts.orchestrator ?? new TmuxOrchestratorAdapter({ socket: config.orchestrator.tmuxSocket, session: config.orchestrator.session, window: config.orchestrator.window },{ maxChars: config.limits.instructionMaxChars });
- try { checkAgtxVersion(await gateway.getHealth(),logger); } catch { logger.warn('agtx_health_unavailable'); }
- try { await gateway.resolveProject(); } catch { logger.warn('agtx_project_unavailable'); }
+ const directory = opts.gateway ? new MockAgtxDirectory([await opts.gateway.resolveProject()],() => opts.gateway!.getHealth()) : new HttpAgtxDirectory(config.agtx);
+ const registry = new ProjectRegistry({ config, directory, gatewayFactory: opts.gateway ? () => opts.gateway! : undefined, orchestratorFactory: opts.orchestrator ? () => opts.orchestrator! : undefined, approvalDetector: createApprovalDetector('task') });
+ try { checkAgtxVersion(await directory.getHealth(),logger); } catch { logger.warn('agtx_health_unavailable'); }
+ try { await registry.list(); } catch { logger.warn('agtx_project_unavailable'); }
  const csrfToken = generateCsrfToken();
  // Port 0 is allowed for explicitly injected test configurations only.
- let app = createApp({ config, gateway, orchestrator, approvalDetector: createApprovalDetector('task'), csrfToken, logger, appVersion: '0.1.0', staticRoot: fileURLToPath(new URL('../../web',import.meta.url)) });
+ let app = createApp({ config, registry, approvalDetector: createApprovalDetector('task'), csrfToken, logger, appVersion: '0.1.0', staticRoot: fileURLToPath(new URL('../../web',import.meta.url)) });
  const server = serve({ fetch: (...args) => app.fetch(...args), hostname: config.listen.host, port: config.listen.port });
  const port = await new Promise<number>((resolve,reject) => {
   server.once('error',reject);
@@ -29,7 +30,7 @@ export async function startServer(opts: { config?: HelmConfig; env?: NodeJS.Proc
    const address = server.address();
    if (!address || typeof address === 'string') { reject(new Error('Invalid server address')); return; }
    config.listen.port = address.port;
-   app = createApp({ config, gateway, orchestrator, approvalDetector: createApprovalDetector('task'), csrfToken, logger, appVersion: '0.1.0', staticRoot: fileURLToPath(new URL('../../web',import.meta.url)) });
+   app = createApp({ config, registry, approvalDetector: createApprovalDetector('task'), csrfToken, logger, appVersion: '0.1.0', staticRoot: fileURLToPath(new URL('../../web',import.meta.url)) });
    resolve(address.port);
   });
  });

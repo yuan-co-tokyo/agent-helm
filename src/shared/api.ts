@@ -9,7 +9,7 @@ export const APPROVAL_MEANINGS = ['approve','approve_always','deny','unknown'] a
 export const APPROVAL_KINDS = ['approval','trust'] as const;
 export type ApprovalKind = typeof APPROVAL_KINDS[number];
 export const AGENT_KINDS = ['claude','codex','generic'] as const;
-export const API_ERROR_CODES = ['bad_request','key_not_sendable','invalid_host','forbidden_origin','csrf_invalid','unsupported_media_type','payload_too_large','not_found','gone','stale','conflict','agtx_unreachable','agtx_timeout','agtx_bad_response','agtx_project_not_found','agtx_project_ambiguous','not_implemented','internal'] as const;
+export const API_ERROR_CODES = ['bad_request','key_not_sendable','invalid_host','forbidden_origin','csrf_invalid','unsupported_media_type','payload_too_large','not_found','gone','stale','conflict','agtx_unreachable','agtx_timeout','agtx_bad_response','project_not_found','agtx_project_not_found','agtx_project_ambiguous','not_implemented','internal'] as const;
 export type TaskStatus = typeof TASK_STATUSES[number];
 export type PhaseStatus = typeof PHASE_STATUSES[number] | null;
 export type DisplayState = typeof DISPLAY_STATES[number];
@@ -45,11 +45,18 @@ export interface OrchestratorStatus { state: 'running'|'not_found'|'ambiguous'|'
 export interface InputReady { ok: boolean; reason?: string }
 export type OrchestratorScreenResponse = PaneSnapshot & { approval: ApprovalPrompt | null; inputReady: InputReady };
 export interface SendResult { requestId: string; outcome: SendOutcome; reason?: string; after?: PaneSnapshot }
-export interface InstructionRequest { text: string; requestId: string }
-export interface ApprovalRespondRequest { target: ApprovalTarget; fingerprint: string; key: string; requestId: string }
+export interface InstructionRequest { projectId: string; text: string; requestId: string }
+export interface ApprovalRespondRequest { projectId: string; target: ApprovalTarget; fingerprint: string; key: string; requestId: string }
 export interface AgtxStatus { checkedAt?: string; reachable: boolean; version: string | null; tuiConnected: boolean | null; error?: ApiErrorBody['error'] }
-export interface StateResponse { fetchedAt: string; agtx: AgtxStatus; orchestrator: OrchestratorStatus; tasks: TaskView[]; attention: AttentionItem[] }
+export interface StateResponse { project: { id: string; name: string }; fetchedAt: string; agtx: AgtxStatus; orchestrator: OrchestratorStatus; tasks: TaskView[]; attention: AttentionItem[] }
 export interface SessionResponse {
- csrfToken: string; target: { project: { name: string; id: string | null }; orchestrator: OrchestratorTarget };
+ csrfToken: string; target: { fixedProjectName: string | null };
  versions: { app: string; agtxSupported: string; agtx: string | null };
 }
+
+export interface ProjectSummary {
+ id: string; name: string; pathTail: string | null; tuiConnected: boolean | null;
+ orchestrator: { state: OrchestratorStatus['state']; reason?: string } | null;
+ attentionCount: number | null; approvalCount: number | null; fetchedAt: string | null; error?: ApiErrorBody['error'];
+}
+export interface ProjectsResponse { fetchedAt: string; agtx: AgtxStatus; mode: string | null; fixedProjectId: string | null; projects: ProjectSummary[] }

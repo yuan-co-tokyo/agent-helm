@@ -1,15 +1,23 @@
 import { createServer } from 'node:http';
-import { projectFixture, taskFixture, TASK_ID } from './fixtures.js';
+import { projectFixture, taskFixture, TASK_ID, PROJECT_ID, PROJECT_B_ID, projectBFixture } from './fixtures.js';
 export interface MockState {
  health: unknown; projects: unknown[]; tasks: Record<string, unknown>[]; panes: Record<string,unknown>;
+ tasksByProject: Record<string,Record<string,unknown>[]>; panesByProject: Record<string,Record<string,unknown>>;
  overrides: Record<string,{ status?: number; body?: unknown; delayMs?: number; raw?: string }>;
 }
-export async function startMockAgtx(opts: { port?: number } = {}) {
+export async function startMockAgtx(opts: { port?: number; multiProject?: boolean } = {}) {
  const state: MockState = {
   health: { version: '1.0.6', mode: 'standalone', project_count: 1, tui_connected: true },
   projects: [structuredClone(projectFixture)], tasks: [structuredClone(taskFixture)],
+  tasksByProject: {}, panesByProject: {},
   panes: { [TASK_ID]: { content: 'Hello' } }, overrides: {}
  };
+ if (opts.multiProject) {
+  state.projects.push(structuredClone(projectBFixture));
+  state.health = { version: '1.0.6', mode: 'global', project_count: 2, tui_connected: true };
+  state.tasksByProject[PROJECT_B_ID] = [{ ...taskFixture, title: 'Playground task', session_name: 'playground-session' }];
+  state.panesByProject[PROJECT_B_ID] = { [TASK_ID]: { content: 'Playground pane' } };
+ }
  const requests: { method: string; path: string; body: unknown }[] = [];
  const timers = new Set<ReturnType<typeof setTimeout>>();
  const server = createServer(async (req,res) => {
@@ -37,12 +45,14 @@ export async function startMockAgtx(opts: { port?: number } = {}) {
   const match = /^\/api\/projects\/([^/]+)\/tasks(?:\/([^/]+))?(?:\/(pane|input))?$/.exec(url.pathname);
   if (!match) return reply(405,{ error: 'unsupported' });
   if (!(state.projects as { id?: string }[]).some(p => p.id === match[1])) return reply(404,{ error: 'project not found' });
+  const tasks = match[1] === PROJECT_ID ? state.tasks : state.tasksByProject[match[1]!] ?? [];
+  const panes = match[1] === PROJECT_ID ? state.panes : state.panesByProject[match[1]!] ?? {};
   const id = match[2]; const action = match[3];
-  if (method === 'GET' && !id) return reply(200,state.tasks);
-  const task = state.tasks.find(t => t.id === id);
+  if (method === 'GET' && !id) return reply(200,tasks);
+  const task = tasks.find(t => t.id === id);
   if (!task) return reply(404,{ error: 'task not found' });
   if (method === 'GET' && !action) return reply(200,task);
-  if (method === 'GET' && action === 'pane') return id && id in state.panes ? reply(200,state.panes[id]) : reply(404,{ error: 'no session' });
+  if (method === 'GET' && action === 'pane') return id && id in panes ? reply(200,panes[id]) : reply(404,{ error: 'no session' });
   if (method === 'POST' && action === 'input') return reply(task.status === 'done' ? 409 : 200,{ delivered: task.status !== 'done' });
   return reply(405,{ error: 'unsupported' });
  });
