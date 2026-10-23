@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { TaskView } from '../../src/shared/api.js';
 import { TaskList } from '../../src/web/components/TaskList.js';
@@ -22,4 +22,15 @@ describe('TaskList', () => {
   rerender(<TaskList tasks={[]} stale={false} />);
   expect(screen.getByText('タスクなし')).toBeTruthy();
  });
+});
+
+it('groups tasks by workflow status and counts each column', () => {
+ render(<TaskList tasks={[task, {...task, id:'plan', title:'Plan next step', status:'planning'}, {...task, id:'done', title:'Finished task', status:'done'}]} stale={false} />);
+ const planning = within(screen.getByRole('region', {name:'計画'}));
+ expect(planning.getByRole('button', {name:'Plan next step'})).toBeTruthy();
+ expect(planning.queryByRole('button', {name:task.title})).toBeNull();
+ expect(planning.getByLabelText('1件')).toBeTruthy();
+ expect(within(screen.getByRole('region', {name:'実行'})).getByRole('button', {name:task.title})).toBeTruthy();
+ expect(within(screen.getByRole('region', {name:'完了'})).getByRole('button', {name:'Finished task'})).toBeTruthy();
+ expect(within(screen.getByRole('region', {name:'バックログ'})).getByLabelText('0件')).toBeTruthy();
 });

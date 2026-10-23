@@ -40,3 +40,8 @@ export const INPUT_BLOCK_REASONS: Record<string,string> = {
 export function inputBlockReason(code: string): string {
  return INPUT_BLOCK_REASONS[code] ?? `送信できない状態です（コード: ${code}）`;
 }
+
+export function formatAge(secs: number): string {
+ const age = Math.max(0, Math.floor(secs));
+ return age < 60 ? `${age}秒` : age < 3600 ? `${Math.floor(age / 60)}分` : `${Math.floor(age / 3600)}時間`;
+}

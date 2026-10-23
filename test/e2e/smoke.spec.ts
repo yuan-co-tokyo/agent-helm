@@ -9,7 +9,7 @@ async function openTask(page: Page) {
  return page.getByRole('dialog', { name: 'Build foundation', exact: true });
 }
 test.beforeEach(async ({ request }) => { await update(request, { reset: true, pane }); });
-test('shows status, attention and detail without horizontal overflow', async ({ page, request }) => {
+test('shows status, attention and detail without horizontal overflow', async ({ page, request }, testInfo) => {
  await page.goto('/');
  await expect(page.getByRole('heading', { name: 'Agent Helm', exact: true })).toBeVisible();
  await expect(page.getByRole('region', { name: '要対応', exact: true })).toContainText('Build foundation');
@@ -18,6 +18,10 @@ test('shows status, attention and detail without horizontal overflow', async ({ 
  await expect(detail.getByRole('button', { name: /\[1\] Yes, proceed/ })).toBeVisible();
  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
  await detail.getByRole('button', { name: '閉じる' }).click();
+ expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+ await page.screenshot({ path: testInfo.outputPath('board-light.png'), fullPage: true });
+ await page.emulateMedia({ colorScheme: 'dark' });
+ await page.screenshot({ path: testInfo.outputPath('board-dark.png'), fullPage: true });
  await update(request, { offline: true });
  await expect(page.locator('header').getByRole('alert')).toBeVisible({ timeout: 10000 });
 });
