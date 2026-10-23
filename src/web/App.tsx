@@ -40,9 +40,9 @@ export function App({ api = defaultApi }: { api?: typeof defaultApi }) {
  },[api]);
  return <><Header session={session} sessionError={error} state={state.data} connected={state.connected && state.data?.agtx.reachable !== false} lastSuccessAt={state.lastSuccessAt} mock={mock} /><main data-tab={tab}>
  <div className="attention-section"><AttentionPanel items={state.data?.attention ?? null} stale={!!state.error} onSelect={target => { if (target.kind === 'task') setSelectedTaskId(target.taskId); else { setTab('console'); consoleRef.current?.focus(); } }} /></div>
- <div className="columns"><div className="console-section" ref={consoleRef} tabIndex={-1}><OrchestratorConsole session={session} status={state.data?.orchestrator} /></div><div className="tasks-section"><TaskList tasks={state.data?.tasks ?? null} stale={!!state.error} selectedId={selectedTaskId} onSelect={setSelectedTaskId} /></div></div>
+ <div className="console-section" ref={consoleRef} tabIndex={-1}><OrchestratorConsole session={session} status={state.data?.orchestrator} /></div><div className="tasks-section"><TaskList tasks={state.data?.tasks ?? null} stale={!!state.error} selectedId={selectedTaskId} onSelect={setSelectedTaskId} /></div>
  {selectedTaskId && <SelectedTask key={selectedTaskId} taskId={selectedTaskId} readApi={readApi} projectName={session?.target.project.name} summary={state.data?.tasks.find(task => task.id === selectedTaskId)} onClose={() => setSelectedTaskId(null)} />}
- <nav className="bottom-tabs" aria-label="表示切替">{[['attention','要対応'],['console','コンソール'],['tasks','タスク']].map(([key,label]) => <button key={key} aria-pressed={tab === key} onClick={() => setTab(key!)}>{label}</button>)}</nav>
+ <nav className="bottom-tabs" aria-label="表示切替">{[['attention','要対応'],['console','コンソール'],['tasks','タスク']].map(([key,label]) => <button key={key} aria-label={label} aria-pressed={tab === key} onClick={() => setTab(key!)}><span aria-hidden="true">{key === 'attention' ? '◇' : key === 'console' ? '>_' : '▤'}</span> {label}{key === 'attention' && <span className="count" aria-hidden="true">{state.data?.attention.length ?? 0}</span>}</button>)}</nav>
  </main></>;
 }
 

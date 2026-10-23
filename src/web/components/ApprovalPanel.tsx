@@ -64,16 +64,16 @@ function TargetPanel({target,projectName,screen}:ApprovalPanelProps & {target:Ap
  }
  const capturedAt = view?.approval?.capturedAt ?? view?.pane?.capturedAt;
  const disabled = (blockedSeq!==null && polling.seq<=blockedSeq) || !!selection || checking || polling.stale || state.kind==='unknown' || state.kind==='sending';
- return <section className="helm-approval" aria-label="承認"><h2>承認</h2>
+ return <section className={`helm-approval ${view?.approval ? 'has-approval' : 'no-approval'}`} aria-label="承認"><h2>承認</h2>
   <p>対象: {projectName} / {view?.title ?? (kind==='task' ? taskId : 'Orchestrator')} / {view?.agent}</p>
   {polling.stale && <p>切断中・古い画面・最終取得 {polling.lastSuccessAt ? formatTime(polling.lastSuccessAt) : '未取得'}</p>}
   <p role="status" aria-live="polite">{gone ? '対象は終了しています' : sendMessage(state,true)}</p>
   {!gone && <><p>取得時刻: {capturedAt ? formatTime(capturedAt) : '未取得'}</p>
-   <p>{view ? view.approval?.question ?? '承認待ちは検出されていません' : '取得中…'}</p>
+   <p className="approval-question">{view ? view.approval?.question ?? '承認待ちは検出されていません' : '取得中…'}</p>
    {view?.approval?.terminalOnly && <><p className="helm-warning">{TERMINAL_ONLY_MESSAGE}</p><p>{view.approval.detail}</p></>}
    {view?.approval?.confirm==='enter' && <p>数字で選択後、カーソル確認のうえ Enter を送ります</p>}
    <pre>{excerpt(view?.pane ?? null)}</pre>
-   <div className="approval-options">{meanings.map(meaning=><div className="approval-group" key={meaning}>{view?.approval?.options.filter(option=>option.meaning===meaning).map(option=><button key={option.key} className={meaning==='approve_always' ? 'helm-warning' : ''} disabled={disabled} onClick={()=> { if (view?.approval) { setVerified(null); setSelection({view,prompt:view.approval,option}); } }}>[{option.key}] {option.label}{' '}{badges[meaning] && <span className="approval-badge"> {badges[meaning]}</span>}</button>)}</div>)}</div>
+   <div className="approval-options">{meanings.map(meaning=><div className="approval-group" key={meaning}>{view?.approval?.options.filter(option=>option.meaning===meaning).map(option=><button key={option.key} className={meaning==='approve_always' ? 'btn-warning' : meaning==='approve' ? 'btn-primary' : ''} disabled={disabled} onClick={()=> { if (view?.approval) { setVerified(null); setSelection({view,prompt:view.approval,option}); } }}>[{option.key}] {option.label}{' '}{badges[meaning] && <span className="approval-badge"> {badges[meaning]}</span>}</button>)}</div>)}</div>
    <button disabled={!!selection || checking} onClick={()=>void checkLatest()}>最新を確認</button>
    {checkFailed && <p className="helm-warning">最新の画面を取得できませんでした</p>}</>}
   {(state.kind==='sent' || state.kind==='sent_unconfirmed') && state.after && <><h3>送信後の画面</h3><pre>{state.after.text}</pre></>}
@@ -90,8 +90,8 @@ function ConfirmDialog({selection,projectName,sending,onCancel,onSend}:{selectio
  }}>
  <h3>キー送信の確認</h3><p>対象: {projectName} / {selection.view.title} / {selection.view.agent}</p>
  <p>取得時刻: {formatTime(selection.prompt.capturedAt)}</p><p>{selection.prompt.question}</p><pre>{excerpt(selection.view.pane)}</pre>
- <p>押すキー: [{selection.option.key}]{selection.prompt.confirm==='enter' ? ' → Enter' : ''} {selection.option.label}</p>
+ <p className="key-preview">押すキー: [{selection.option.key}]{selection.prompt.confirm==='enter' ? ' → Enter' : ''} {selection.option.label}</p>
  {selection.option.meaning==='approve_always' && <p className="helm-warning">⚠ 以後確認しない: 今後の操作が確認なしで許可される可能性があります。</p>}
- <button ref={cancel} disabled={sending} onClick={onCancel}>キャンセル</button><button ref={send} disabled={sending} onClick={onSend}>送信</button>
+ <button ref={cancel} disabled={sending} onClick={onCancel}>キャンセル</button><button className="btn-primary" ref={send} disabled={sending} onClick={onSend}>送信</button>
  </div></div>;
 }
