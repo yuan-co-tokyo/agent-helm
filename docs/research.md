@@ -118,3 +118,17 @@
 - 利用者から入力できない理由が分からないとの報告。`input_not_empty` 等を日本語化し、入力欄のプレースホルダーでも検出されることを明記。
 
 今回の実装では数字後の指紋・カーソルを確認した場合だけ Enter を送る。同じ承認が残ると sent_unconfirmed、選択確認に失敗すると Enter を送らず unknown。修正後は実画面フィクスチャ＋モックで検証し、実 agtx や本番 Orchestrator へは送信していない。
+
+## 10. 2回目の実機検証（2026-10-23）
+
+承認済み T11 計画に記録された Orchestrator の実測。使い捨て `agent-helm-verify2`、main `ffef1ac`、agtx 1.0.6 / Codex 0.156.1 を使用し、検証後削除した。
+
+- agtx `/input` に `{"key":"Escape"}` を直接1回送信すると、HTTP 200 / `{"delivered":true}` と `Conversation interrupted` を確認できた。その前に開いた Web の確認ダイアログからの送信は stale の POST 409（36ms）となり、agtx の `input from web` は3件のまま増えなかった。ログ件数から承認キーの未送信を確認できる。
+- Codex trust は数字→Enter の二段階。`approval_send outcome=sent steps=key+enter`、POST 200（2102ms）、agtx の `input from web delivered:true` は約1秒間隔で2件。trust 消失と作業開始を確認した。`delivered:true` 自体はキー配送のみを示す。
+- exec は Web から `1` を送るだけで確定。POST 200（1076ms）、`steps=key` で承認消失後に `sent` と判定し、curl の実行・完了を確認した。
+- Codex の信頼はリポジトリルート単位で `~/.codex/config.toml` に保存され、同一パスでは trust が再表示されない。再現には別名リポジトリを使用した。
+- 9節の Claude trust に `/exit` が入る事例は、起動前に Claude でリポジトリを信頼すると再発せず、Codex の trust まで進んだ。事前信頼による回避を確認した。
+- 実 `/pane` の待機プロンプト `› Ask Codex to do anything` に対し、`/api/state` は `displayState=awaiting_input`、attention は0件。T10 のプレースホルダー判別を実画面で確認した。
+- T10 マージ前の本番読み取り専用確認では、T0〜T9 完了、#2 / #3 / #4 / #9 / #10 / #11 / #12 は MERGED、#5〜#7 はクローズ（#9 で統合）。T6 では CLOSED #8 より MERGED #9 が選ばれ、MERGED 優先の実例を確認した。テスト結果は未取得表示のまま。
+
+本番タスク・本番 Orchestrator への送信は行っていない。実測の詳細・受け入れ条件の判定と残件は [検証記録](verification.md) を参照。

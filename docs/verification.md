@@ -1,10 +1,26 @@
 # 統合検証記録
 
+## 2回目の実機検証（2026-10-23）
+
+承認済み T11 計画に記録された Orchestrator の実測を反映。使い捨て agtx プロジェクト `agent-helm-verify2`、main `ffef1ac`、agtx 1.0.6 / Codex 0.156.1 を使用し、検証環境は検証後削除した。本番タスク・本番 Orchestrator への送信は行っていない。
+
+1. **Codex trust の二段階確定**: `kind=trust, confirm=enter, selected=1` と検出。Web 送信で `approval_send outcome=sent steps=key+enter`、POST 200（2102ms）。agtx の `input from web delivered:true` は約1秒間隔で2件記録され、数字→Enter の後に trust を抜けて作業を開始した。
+2. **stale（AC-07）**: `3. No` を選択した確認ダイアログを開いたまま、agtx `/input` に `{"key":"Escape"}` を直接1回送信。HTTP 200 / `{"delivered":true}` と `Conversation interrupted` を確認した。その後の Web 送信は POST **409**（36ms）となり、agtx の `input from web` は3件のまま増えず、stale な承認キーが未送信であることを確認した。
+3. **許可後の確定判定**: 再度 curl の実行許可を出し、Web から `1` を送信。POST 200（1076ms）、`steps=key` で承認消失を確認して `sent` となった。curl の実行・完了（`Worked for 2m 18s`）を確認した。
+4. **待機中 Codex**: 実 `/pane` の画面が `› Ask Codex to do anything` のとき、`/api/state` は `displayState=awaiting_input`、attention は0件。T10 のプレースホルダー判別を実画面で確認した。
+5. **初回起動と信頼の保存単位**: 事前に Claude でリポジトリを信頼してから起動すると、T8 の trust 画面へ `/exit` が入る問題は再発せず、Codex の trust が表示された。Codex の信頼はリポジトリルート単位で `~/.codex/config.toml` に保存され、同一パスでは再表示されないため、別名リポジトリを使用した。
+
+`delivered:true` はキー配送のみを示す。trust・実行許可の確定は送信後の画面で、stale 時の未送信は agtx のログ件数が増えないことで確認した。対象終了・不明応答の異常系は今回も実機では検証しておらず、ルート・自動テストによる確認である。
+
+### T10 マージ前の本番読み取り専用確認（AC-09）
+
+T0〜T9 の完了と PR 表示を読み取りのみで確認。#2 / #3 / #4 / #9 / #10 / #11 / #12 は MERGED、#5〜#7 はクローズ（#9 で統合）。T6 は CLOSED の #8 ではなく MERGED の #9 を選択した。MERGED 優先の実例を確認したもので、テスト結果は仕様制限として未取得表示のままである。
+
 ## T8 実機検証（2026-10-22）
 
 承認済み T8 計画に記録された実測を反映。使い捨て `agent-helm-verify`、agtx 1.0.6 / Codex 0.156.1 を使用し、検証環境は検証後削除した。日本語・改行の Orchestrator 入力、Web から Codex 実行許可の `3` 拒否・`1` 許可、serve 停止を確認。実 `/input` は HTTP 200 / `{"delivered":true}` を返した。これはキーを渡したことを示し、承認の受理は保証しない。
 
-trust の数字は選択のみだったため、数字後の同一指紋とカーソル一致を確認して Enter を送る実装に変更。exec は数字だけで確定する。送信後に同じ承認が残る場合は「画面が変わっていません」と表示する。今回の修正後の二段階送信・確定判定は実画面フィクスチャとモックで検証し、実 agtx・本番 Orchestrator への再送信は行わない。
+trust の数字は選択のみだったため、数字後の同一指紋とカーソル一致を確認して Enter を送る実装に変更。exec は数字だけで確定する。送信後に同じ承認が残る場合は「画面が変わっていません」と表示する。今回の修正後の二段階送信・確定判定は実画面フィクスチャとモックで検証し、実 agtx・本番 Orchestrator への再送信は行わない。T8 時点の記録であり、修正後の経路は上記の2回目検証で実機確認した。
 
 T8 修正の検証: `pnpm typecheck` / `pnpm lint` / `pnpm build` 成功。`pnpm test` は 38 ファイル・320 件成功、実 agtx 契約テスト 1 件 skip。その後に入力待ちフィクスチャ 5 件と理由ラベルを補完し、関連 2 ファイル・28 件、型チェック・lint・ビルドを再確認。`pnpm test:e2e` は desktop/mobile 計 8 件成功。HTTP・専用 tmux・Chromium は承認を得てサンドボックス外で実行。
 
@@ -51,17 +67,17 @@ AGTX_CONTRACT=1 AGTX_BASE_URL=http://127.0.0.1:8799 pnpm test test/contract
 | AC-01 ローカル起動・接続 | 達成 | build 後の startServer を loopback 8794 で起動し、実 agtx 8799 接続・UI 表示を確認。通常起動コマンドは README に記載 |
 | AC-02 日本語・改行を既存 Orchestrator へ送信 | 達成 | T8 実機検証で日本語・改行の入力を確認。専用実 tmux の E2E でも検証 |
 | AC-03 状態更新・詳細 | 達成 | 実 7 タスクと T6 詳細を Chromium で確認、GET 契約テスト成功。exited/ended を完了扱いしない |
-| AC-04 Claude 許可・拒否 | 未検証 | agtx は Claude を bypass で起動するため実 agtx タスクでは検証不可。専用 tmux の実画面と Web 拒否の確認が上限。番号なし trust は端末操作を案内 |
-| AC-05 Codex 許可・拒否 | 達成 | T8 で Web から `3` 拒否・`1` 許可を確認。trust は数字＋Enter 確定へ修正（修正後はフィクスチャ＋モック検証） |
+| AC-04 Claude 許可・拒否 | 未検証 | agtx は Claude を bypass で起動するため実 agtx タスクでは検証不可。専用 tmux の実画面と Web 拒否の確認が上限。番号なし trust は端末操作を案内。2回目検証でも agtx は Claude を bypass 起動 |
+| AC-05 Codex 許可・拒否 | 達成 | T8 で Web から `3` 拒否・`1` 許可を確認。trust は数字＋Enter 確定へ修正し、2回目検証で二段階確定を実機確認 |
 | AC-06 Orchestrator 自身の承認 | 達成 | 専用 Claude を対象に、Web の対象・キー確認→`2` 送信→実画面中断を確認。本番 Orchestrator には送信していない |
-| AC-07 stale・終了・二重クリック・不明 | 未検証 | ルート/UI テストと E2E は成功。実 agtx の不明応答・対象終了を伴う異常系は未検証 |
+| AC-07 stale・終了・二重クリック・不明 | 達成 | 2回目検証で実 agtx の stale 時に 409・キー未送信を確認。ルート/UI テストと E2E は成功。対象終了・不明応答は実機未検証で、ルート・自動テストで同じ安全側の動作を確認 |
 | AC-08 停止・切断 | 達成 | T8 の serve 停止で到達不可を確認。前回の TUI 接続値を残す問題を修正し、不明表示を回帰テストで確認 |
-| AC-09 PR・テスト結果 | 未検証 | PR は agtx の pr_url、無ければ branch_name で gh pr list --head 補完（MERGED 優先→updatedAt 最新）。分類・リンク・ブランチ補完の自動テスト成功、実 PR 状態遷移は未確認。テスト結果は仕様制限として未取得表示 |
+| AC-09 PR・テスト結果 | 達成 | PR は agtx の pr_url、無ければ branch_name で gh pr list --head 補完（MERGED 優先→updatedAt 最新）。分類・リンク・ブランチ補完の自動テスト成功。本番読み取り専用確認で PR 表示（CLOSED #8 より MERGED #9 を優先）を確認。テスト結果は仕様制限として未取得表示 |
 | AC-10 PC/スマホ幅 | 達成 | Chromium 1280×800 / 390×844 で検証。外部公開禁止のため実スマートフォン端末は対象外 |
 | AC-11 注入・対象外防止 | 達成 | 実 tmux のリテラル文字列入力・完全一致対象、HTTP セキュリティ境界値、UI エスケープのテスト成功 |
 | AC-12 外部公開・既存環境破壊なし | 達成 | loopback のみ、main/PR マージなし、既存タスクへの入力なし。下記のプロジェクト登録副作用あり |
 | AC-13 Adapter 経由 | 達成 | agtx は HttpAgtxGateway、Orchestrator は TmuxOrchestratorAdapter。内部 DB 直接書き換えなし |
-| AC-14 統合一連の流れ | 達成 | T8 実 agtx 入力と Codex 許可・拒否を確認。確定判定、trust、TUI 不明、入力待ち表示の修正を含む。修正後の経路は自動テストで検証し、実機での再検証は未実施 |
+| AC-14 統合一連の流れ | 達成 | T8 実 agtx 入力と Codex 許可・拒否を確認。確定判定、trust、TUI 不明、入力待ち表示の修正を含む。修正後の経路は自動テストで検証し、2回目検証で trust 二段階・stale・許可後確定・入力待ち表示を実機で再確認 |
 
 ## 実画面フィクスチャ
 
@@ -98,4 +114,4 @@ T6 で `agtx --help` が TUI を起動して検証ワークツリーを自動登
 - 完了／未着手は stale より優先、agtx 切断は最優先。依存・エスカレーションが残っても要対応に含めず、一覧でペインを照会しないことを確認。
 - 推定 ANSI フィクスチャと隔離 tmux の printf → capture-pane -e により dim／灰色の保持と入力待ち判定を確認。通常色の入力は入力途中、内部 inputText は詳細 API に含めない。
 - `pnpm typecheck`、`pnpm lint`、`pnpm build` 成功。`pnpm test`: 373 成功・実 agtx 契約テスト1件スキップ。`pnpm test:e2e`: desktop/mobile 計8件成功。
-- 実 agtx `/pane` の取得と実 GitHub PR の状態遷移は未検証。マージ後に Orchestrator が本番を読み取り専用で再確認予定。今回、実 agtx への送信・GitHub 書き込みは実施していない。
+- 実 agtx `/pane` の取得と実 GitHub PR の状態遷移は未検証。マージ後に Orchestrator が本番を読み取り専用で再確認予定。今回、実 agtx への送信・GitHub 書き込みは実施していない。→ 上記の2回目の実機検証で実 `/pane` の取得・状態判定を確認済み。PR は上記の T10 マージ前の本番読み取り専用確認で表示・選択結果を確認済み（状態遷移の操作は行っていない）。
