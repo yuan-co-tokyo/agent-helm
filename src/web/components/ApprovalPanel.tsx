@@ -1,21 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ApprovalMeaning, ApprovalOption, ApprovalPrompt, ApprovalTarget, OrchestratorScreenResponse, PaneSnapshot, SendResult, TaskDetailView } from '../../shared/api.js';
 import { isUuid, TERMINAL_ONLY_MESSAGE } from '../../shared/constants.js';
+import { projectPath } from '../api/paths.js';
 import { apiGet, apiPost, HelmApiError } from '../api/client.js';
 import { usePaneScreenPolling, type PaneScreenPolling } from '../hooks/usePaneScreenPolling.js';
 import { classifySendError, formatTime, fromResult, sendMessage, type SendState } from '../lib/send-state.js';
 import './console-approval.css';
-export interface ApprovalPanelProps { target:ApprovalTarget|null; projectName?:string; screen?:PaneScreenPolling<OrchestratorScreenResponse | TaskDetailView> }
+export interface ApprovalPanelProps { target:ApprovalTarget|null; project:{id:string;name:string}; screen?:PaneScreenPolling<OrchestratorScreenResponse | TaskDetailView> }
 interface TargetView { title:string; agent:string|null; approval:ApprovalPrompt|null; pane:PaneSnapshot|null }
-interface Selection { view:TargetView; prompt:ApprovalPrompt; option:ApprovalOption }
+interface Selection { project:{id:string;name:string}; view:TargetView; prompt:ApprovalPrompt; option:ApprovalOption }
 const meanings: ApprovalMeaning[] = ['deny','unknown','approve','approve_always'];
 const badges = {deny:'拒否',unknown:'',approve:'承認',approve_always:'⚠ 以後確認しない'};
 const excerpt = (pane:PaneSnapshot|null)=>pane?.text.split('\n').slice(-20).join('\n') ?? '画面なし';
-export function ApprovalPanel({target,projectName,screen}:ApprovalPanelProps) {
+export function ApprovalPanel({target,project,screen}:ApprovalPanelProps) {
  if (!target) return null;
- return <TargetPanel key={target.kind==='task' ? target.taskId : 'orchestrator'} target={target} projectName={projectName} screen={screen} />;
+ return <TargetPanel key={project.id + (target.kind==='task' ? target.taskId : 'orchestrator')} target={target} project={project} screen={screen} />;
 }
-function TargetPanel({target,projectName,screen}:ApprovalPanelProps & {target:ApprovalTarget}) {
+function TargetPanel({target,project,screen}:ApprovalPanelProps & {target:ApprovalTarget}) {
  const kind = target.kind, taskId = target.kind==='task' ? target.taskId : '';
  const [selection,setSelection] = useState<Selection|null>(null);
  const [state,setState] = useState<SendState>({kind:'idle'});
@@ -26,11 +27,11 @@ function TargetPanel({target,projectName,screen}:ApprovalPanelProps & {target:Ap
  const load = useCallback(async ():Promise<TargetView>=> {
   if (kind==='task') {
    if (!isUuid(taskId)) throw new HelmApiError(400,'bad_request');
-   return apiGet<TaskDetailView>(`/api/tasks/${encodeURIComponent(taskId)}`);
+   return apiGet<TaskDetailView>(projectPath(project.id,'tasks',taskId));
   }
-  const screen = await apiGet<OrchestratorScreenResponse>('/api/orchestrator/screen');
+  const screen = await apiGet<OrchestratorScreenResponse>(projectPath(project.id,'orchestrator','screen'));
   return {title:'Orchestrator',agent:screen.approval?.agentKind ?? null,approval:screen.approval,pane:screen};
- },[kind,taskId]);
+ },[kind,taskId,project.id]);
  const shared = !!screen;
  const own = usePaneScreenPolling(load,1500,!shared && !selection && state.kind!=='unknown' && state.kind!=='gone' && !checking);
  const screenData = screen?.data;
@@ -56,7 +57,7 @@ function TargetPanel({target,projectName,screen}:ApprovalPanelProps & {target:Ap
   if (!globalThis.crypto?.randomUUID) { setState({kind:'rejected',reason:'安全な requestId を生成できません'}); setSelection(null); return; }
   inFlight.current = true; setState({kind:'sending'});
   let result:SendState;
-  try { result = fromResult(await apiPost<SendResult>('/api/approvals/respond',{target,fingerprint:selection.prompt.fingerprint,key:selection.option.key,requestId:crypto.randomUUID()})); }
+  try { result = fromResult(await apiPost<SendResult>(projectPath(selection.project.id,'approvals','respond'),{projectId:selection.project.id,target,fingerprint:selection.prompt.fingerprint,key:selection.option.key,requestId:crypto.randomUUID()})); }
   catch(error) { result = classifySendError(error); }
   if (result.kind==='stale' || result.kind==='sent' || result.kind==='sent_unconfirmed') { setBlockedSeq(polling.startedSeq()); polling.refresh(); }
   if (result.kind==='unknown' || result.kind==='gone') setHeld(selection.view);
@@ -65,7 +66,7 @@ function TargetPanel({target,projectName,screen}:ApprovalPanelProps & {target:Ap
  const capturedAt = view?.approval?.capturedAt ?? view?.pane?.capturedAt;
  const disabled = (blockedSeq!==null && polling.seq<=blockedSeq) || !!selection || checking || polling.stale || state.kind==='unknown' || state.kind==='sending';
  return <section className={`helm-approval ${view?.approval ? 'has-approval' : 'no-approval'}`} aria-label="承認"><h2>承認</h2>
-  <p>対象: {projectName} / {view?.title ?? (kind==='task' ? taskId : 'Orchestrator')} / {view?.agent}</p>
+  <p>対象: {project.name} / {view?.title ?? (kind==='task' ? taskId : 'Orchestrator')} / {view?.agent}</p>
   {polling.stale && <p>切断中・古い画面・最終取得 {polling.lastSuccessAt ? formatTime(polling.lastSuccessAt) : '未取得'}</p>}
   <p role="status" aria-live="polite">{gone ? '対象は終了しています' : sendMessage(state,true)}</p>
   {!gone && <><p>取得時刻: {capturedAt ? formatTime(capturedAt) : '未取得'}</p>
@@ -73,14 +74,14 @@ function TargetPanel({target,projectName,screen}:ApprovalPanelProps & {target:Ap
    {view?.approval?.terminalOnly && <><p className="helm-warning">{TERMINAL_ONLY_MESSAGE}</p><p>{view.approval.detail}</p></>}
    {view?.approval?.confirm==='enter' && <p>数字で選択後、カーソル確認のうえ Enter を送ります</p>}
    <pre>{excerpt(view?.pane ?? null)}</pre>
-   <div className="approval-options">{meanings.map(meaning=><div className="approval-group" key={meaning}>{view?.approval?.options.filter(option=>option.meaning===meaning).map(option=><button key={option.key} className={meaning==='approve_always' ? 'btn-warning' : meaning==='approve' ? 'btn-primary' : ''} disabled={disabled} onClick={()=> { if (view?.approval) { setVerified(null); setSelection({view,prompt:view.approval,option}); } }}>[{option.key}] {option.label}{' '}{badges[meaning] && <span className="approval-badge"> {badges[meaning]}</span>}</button>)}</div>)}</div>
+   <div className="approval-options">{meanings.map(meaning=><div className="approval-group" key={meaning}>{view?.approval?.options.filter(option=>option.meaning===meaning).map(option=><button key={option.key} className={meaning==='approve_always' ? 'btn-warning' : meaning==='approve' ? 'btn-primary' : ''} disabled={disabled} onClick={()=> { if (view?.approval) { setVerified(null); setSelection({project:{...project},view,prompt:view.approval,option}); } }}>[{option.key}] {option.label}{' '}{badges[meaning] && <span className="approval-badge"> {badges[meaning]}</span>}</button>)}</div>)}</div>
    <button disabled={!!selection || checking} onClick={()=>void checkLatest()}>最新を確認</button>
    {checkFailed && <p className="helm-warning">最新の画面を取得できませんでした</p>}</>}
   {(state.kind==='sent' || state.kind==='sent_unconfirmed') && state.after && <><h3>送信後の画面</h3><pre>{state.after.text}</pre></>}
-  {selection && <ConfirmDialog selection={selection} projectName={projectName} sending={state.kind==='sending'} onCancel={()=> { if (!inFlight.current) setSelection(null); }} onSend={()=>void send()} />}
+  {selection && <ConfirmDialog selection={selection} sending={state.kind==='sending'} onCancel={()=> { if (!inFlight.current) setSelection(null); }} onSend={()=>void send()} />}
  </section>;
 }
-function ConfirmDialog({selection,projectName,sending,onCancel,onSend}:{selection:Selection;projectName?:string;sending:boolean;onCancel:()=>void;onSend:()=>void}) {
+function ConfirmDialog({selection,sending,onCancel,onSend}:{selection:Selection;sending:boolean;onCancel:()=>void;onSend:()=>void}) {
  const cancel = useRef<HTMLButtonElement>(null);
  const send = useRef<HTMLButtonElement>(null);
  useEffect(()=> { const previous = document.activeElement; cancel.current?.focus(); return ()=> { if (previous instanceof HTMLElement) previous.focus(); }; },[]);
@@ -88,7 +89,7 @@ function ConfirmDialog({selection,projectName,sending,onCancel,onSend}:{selectio
   if (event.key==='Escape' && !sending) onCancel();
   if (event.key==='Tab') { event.preventDefault(); if (!sending) (document.activeElement===cancel.current ? send : cancel).current?.focus(); }
  }}>
- <h3>キー送信の確認</h3><p>対象: {projectName} / {selection.view.title} / {selection.view.agent}</p>
+ <h3>キー送信の確認</h3><p>送信先プロジェクト: {selection.project.name}</p><p>対象: {selection.project.name} / {selection.view.title} / {selection.view.agent}</p>
  <p>取得時刻: {formatTime(selection.prompt.capturedAt)}</p><p>{selection.prompt.question}</p><pre>{excerpt(selection.view.pane)}</pre>
  <p className="key-preview">押すキー: [{selection.option.key}]{selection.prompt.confirm==='enter' ? ' → Enter' : ''} {selection.option.label}</p>
  {selection.option.meaning==='approve_always' && <p className="helm-warning">⚠ 以後確認しない: 今後の操作が確認なしで許可される可能性があります。</p>}

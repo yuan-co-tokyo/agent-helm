@@ -14,19 +14,19 @@ describe('security',() => {
  ] as const)('rejects %s=%s',async (key,value,status,code) => {
   const requestHeaders: Record<string,string> = { ...headers };
   if (value === undefined) delete requestHeaders[key]; else requestHeaders[key] = value;
-  const result = await makeApp().app.request('/api/approvals/respond',{ method: 'POST', headers: requestHeaders });
+  const result = await makeApp().app.request('/api/projects/11111111-1111-4111-8111-111111111111/approvals/respond',{ method: 'POST', headers: requestHeaders });
   expect(result.status).toBe(status); expect(await result.json()).toMatchObject({ error: { code } });
  });
  it('allows valid JSON POST; protects all mutation verbs',async () => {
   const { app } = makeApp();
-  expect((await app.request('/api/approvals/respond',{ method: 'POST', headers: { ...headers, 'content-type': 'Application/JSON; charset=utf-8' }, body: '{}' })).status).toBe(400);
+  expect((await app.request('/api/projects/11111111-1111-4111-8111-111111111111/approvals/respond',{ method: 'POST', headers: { ...headers, 'content-type': 'Application/JSON; charset=utf-8' }, body: '{}' })).status).toBe(400);
   for (const method of ['OPTIONS','PUT','DELETE','PATCH']) expect((await app.request('/api/session',{ method, headers: { host: headers.host } })).status).toBe(403);
  });
  it('accepts matching localhost and IPv6 origins',async () => {
-  for (const host of ['localhost:8790','[::1]:8790']) expect((await makeApp().app.request('/api/approvals/respond',{ method: 'POST', headers: { ...headers, host, origin: 'http://' + host }, body: '{}' })).status).toBe(400);
+  for (const host of ['localhost:8790','[::1]:8790']) expect((await makeApp().app.request('/api/projects/11111111-1111-4111-8111-111111111111/approvals/respond',{ method: 'POST', headers: { ...headers, host, origin: 'http://' + host }, body: '{}' })).status).toBe(400);
  });
  it('rejects oversized body without trusting content-length',async () => {
-  const result = await makeApp().app.request('/api/approvals/respond',{ method: 'POST', headers, body: JSON.stringify({ text: 'x'.repeat(65536) }) });
+  const result = await makeApp().app.request('/api/projects/11111111-1111-4111-8111-111111111111/approvals/respond',{ method: 'POST', headers, body: JSON.stringify({ projectId: '11111111-1111-4111-8111-111111111111', text: 'x'.repeat(65536) }) });
   expect(result.status).toBe(413);
  });
  it('sets security headers even on errors and never enables CORS',async () => {
@@ -39,9 +39,9 @@ describe('security',() => {
  });
  it('does not log body, query or CSRF',async () => {
   const { app, logs } = makeApp();
-  await app.request('/api/approvals/respond?secret=query-secret',{ method: 'POST', headers, body: JSON.stringify({ text: 'private-pane-and-instruction' }) });
+  await app.request('/api/projects/11111111-1111-4111-8111-111111111111/approvals/respond?secret=query-secret',{ method: 'POST', headers, body: JSON.stringify({ projectId: '11111111-1111-4111-8111-111111111111', text: 'private-pane-and-instruction' }) });
   const log = logs.join('');
   for (const secret of ['query-secret','test-csrf-secret','private-pane-and-instruction']) expect(log).not.toContain(secret);
-  expect(log).toContain('/api/approvals/respond');
+  expect(log).toContain('/api/projects/11111111-1111-4111-8111-111111111111/approvals/respond');
  });
 });

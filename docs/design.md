@@ -27,6 +27,20 @@ src/web/         React UI
 test/            fixtures（実ペインのサンプル）、モック agtx サーバー
 ```
 
+## マルチプロジェクト構成（T12）
+
+`AgtxDirectory` が health と登録一覧を提供し、`ProjectRegistry` が5秒キャッシュ・single-flightで一覧を共有する。固定モードでは名前の完全一致で1件に限定する。`ProjectContext` は UUID ごとに gateway、orchestrator、StatusService、承認 RequestStore/TargetLocks、指示 RequestCache を保持する。最大32件で、リクエスト処理中の context は破棄しない。名前・パス・解決先の変更時は再生成し、処理中なら conflict を返す。
+
+プロジェクトルートは共通ディスパッチャで UUID・存在・POST本文の projectId 一致を検証してから context に束縛した Hono ルートへ渡す。旧プロジェクト非指定ルートは404。承認は宛先 gateway でタスク・ペインを再取得し fingerprint を照合する。同じ requestId でもプロジェクト間では独立し、同一プロジェクト内で target/fingerprint/key が変わると409。指示の署名にも pid を含める。
+
+`GET /api/projects` は集計の同時数3、1件4秒タイムアウト。失敗したカードは件数不明とエラーを返し、他のカードを維持する。パスは末尾だけ公開し、TUI 状態は各プロジェクトの値を使う。個別 state と detail もプロジェクトの TUI 状態を優先する。
+
+送信先は `orchestrators[name]` → 固定モードの session → プロジェクト名（`.` / `:` を `_` へ）の順。非 ASCII 等の未解決名は not_found。同一ターゲットに解決する全プロジェクトを target_collision で拒否する。解決不可 adapter は tmux を呼ばない。ウィンドウは番号ではなく完全一致の名前で検索する。
+
+Web は `#/` と `#/p/<UUID>` を使う。ProjectView を projectId の key で再マウントし、タスク選択・確認ダイアログ・古いポーリング結果を破棄する。state.project.id の不一致も拒否する。確認時の project を Selection に固定し、送信先プロジェクト名を明示する。
+
+API は README の一覧を参照。以下の単一プロジェクト構成・設定例は固定モードとしても利用できる。
+
 ## 2. 全体構成
 
 ```
@@ -50,8 +64,8 @@ Browser ──(same origin, 127.0.0.1:8790)── BFF(Hono)
 }
 ```
 
-- `agtx.baseUrl` は loopback のみ許可。プロジェクトは名前で指定し、起動時と定期的に `/api/projects` で UUID に解決（一致 0 件・複数件はエラー表示）。
-- tmux 対象（ソケット・セッション・ウィンドウ）は設定値のみ。**ウィンドウ内のペインがちょうど 1 つ**であることを毎回検証し、0 または複数なら送信しない。
+- `agtx.baseUrl` は loopback のみ許可。固定モードのプロジェクトは名前で指定し、起動時と定期的に `/api/projects` で UUID に解決（一致 0 件・複数件はエラー表示）。
+- tmux 対象（ソケット・セッション・ウィンドウ）は上記の解決規則で決定する。**ウィンドウ内のペインがちょうど 1 つ**であることを毎回検証し、0 または複数なら送信しない。
 
 ## 4. AgtxGateway
 
@@ -111,7 +125,7 @@ interface OrchestratorAdapter {
    - `meaning` はラベル文言から判定し、判定できなければ `unknown`（UI はキーとラベルをそのまま表示）。`approve_always`（以後確認しない）は UI で警告表示し既定選択にしない。
    - 検出不能でも `phase_status=blocked` / `agent_state=blocked` なら「要対応（理由不明）」として画面を表示。blocked を承認待ちと決めつけない。
 2. **フィンガープリント**：検出領域（質問〜選択肢）の正規化テキストの SHA-256。
-3. **送信** `POST /api/approvals/respond {target, fingerprint, key, requestId}`：
+3. **送信** `POST /api/projects/:pid/approvals/respond {target, fingerprint, key, requestId}`：
    - `requestId`（UI 生成 UUID）が既知 → 前回結果をそのまま返し再送しない。
    - 対象を再取得：タスクが存在しない／Planning・Running・Review 以外／セッションなし → 410。
    - 画面を再取得し再検出。フィンガープリント不一致・承認画面消失 → 409 `stale`（送信しない）。
@@ -149,18 +163,18 @@ PR：`pr_url`/`pr_number` を表示。`gh pr view <url> --json state,isDraft,rev
 | メソッド | パス | 応答 |
 |---|---|---|
 | GET | `/api/session` | `{csrfToken, target:{project, orchestrator}, versions}` |
-| GET | `/api/state` | `{fetchedAt, agtx:{reachable, version, tuiConnected, error?}, orchestrator:OrchestratorStatus, tasks:TaskView[], attention:AttentionItem[]}` |
-| GET | `/api/tasks/:id` | `TaskDetailView`（description, pane, approval?, pr） |
-| GET | `/api/orchestrator/screen?lines=` | `PaneSnapshot & {approval?, inputReady:{ok, reason?}}` |
-| POST | `/api/orchestrator/instructions` | `{text, requestId}` → `SendResult` |
-| POST | `/api/approvals/respond` | 上記 |
+| GET | `/api/projects/:pid/state` | `{fetchedAt, agtx:{reachable, version, tuiConnected, error?}, orchestrator:OrchestratorStatus, tasks:TaskView[], attention:AttentionItem[]}` |
+| GET | `/api/projects/:pid/tasks/:id` | `TaskDetailView`（description, pane, approval?, pr） |
+| GET | `/api/projects/:pid/orchestrator/screen?lines=` | `PaneSnapshot & {approval?, inputReady:{ok, reason?}}` |
+| POST | `/api/projects/:pid/orchestrator/instructions` | `{text, requestId}` → `SendResult` |
+| POST | `/api/projects/:pid/approvals/respond` | 上記 |
 
 `SendResult = {requestId, outcome:'sent'|'rejected'|'unknown', reason?, after?:PaneSnapshot}`。
 エラーは `{error:{code, message}}`。
 
 ## 9. 更新方式
 
-- ブラウザ → BFF：**ポーリング**（`/api/state` 3 秒、表示中のペイン 1.5 秒）。タブ非表示時は停止、復帰時に即時取得。失敗時は指数バックオフ（最大 15 秒）し「切断中・最終取得 hh:mm:ss」を表示。
+- ブラウザ → BFF：**ポーリング**（`/api/projects/:pid/state` 3 秒、表示中のペイン 1.5 秒）。タブ非表示時は停止、復帰時に即時取得。失敗時は指数バックオフ（最大 15 秒）し「切断中・最終取得 hh:mm:ss」を表示。
 - 理由：SSE/WS より実装・再接続が単純。agtx の WS は差分フレームのみで、承認検出には全画面が必要なため BFF からは HTTP `/pane` と tmux capture を使う。
 - 取得失敗時は前回値を「古い」表示で残し、**空一覧や完了として扱わない**。
 

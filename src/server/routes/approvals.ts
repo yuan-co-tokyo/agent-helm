@@ -1,12 +1,13 @@
 import type { Hono } from 'hono';
 import { z } from 'zod';
-import type { AppDeps } from '../app.js';
+import type { ProjectDeps } from '../app.js';
 import type { AgtxKey, ApiErrorCode, ApprovalRespondRequest, OrchestratorKey, SendResult } from '../../shared/api.js';
 import { GatewayError } from '../agtx/types.js';
 import { detectApproval, toApprovalPrompt } from '../approval/index.js';
-import { RequestStore, TargetLocks, type StoredResponse } from '../approval/store.js';
+import { type StoredResponse } from '../approval/store.js';
 import { gatewayErrorToResponse } from './errors.js';
 const schema = z.object({
+ projectId: z.uuid(),
  target: z.discriminatedUnion('kind',[z.object({ kind: z.literal('task'), taskId: z.uuid() }),z.object({ kind: z.literal('orchestrator') })]),
  fingerprint: z.string().regex(/^[0-9a-f]{64}$/), key: z.string().min(1).max(16), requestId: z.uuid()
 });
@@ -21,9 +22,8 @@ async function sendWithTimeout(send: () => Promise<Omit<SendResult,'requestId'>>
  } catch { return { outcome: 'unknown', reason: 'error' }; }
  finally { clearTimeout(timer); }
 }
-export function registerApprovalRoutes(app: Hono, deps: AppDeps) {
- const store = new RequestStore();
- const locks = new TargetLocks();
+export function registerApprovalRoutes(app: Hono, deps: ProjectDeps) {
+ const { store, locks } = deps.approvals;
  async function respond(request: ApprovalRespondRequest): Promise<StoredResponse> {
   const { target, requestId } = request;
   let agentHint: string | null = null;
@@ -77,17 +77,19 @@ export function registerApprovalRoutes(app: Hono, deps: AppDeps) {
   deps.logger.info('approval_send',{ outcome: result.outcome, steps });
   return { status: 200, body: result };
  }
- app.post('/api/approvals/respond',async c => {
+ app.post('/api/projects/:pid/approvals/respond',async c => {
   const parsed = schema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) { const result = error(400,'bad_request','Invalid approval request'); return c.json(result.body,result.status); }
   const request = parsed.data;
+  const signature = JSON.stringify([request.projectId,request.target,request.fingerprint,request.key]);
+  if (store.signature(request.requestId) !== undefined && store.signature(request.requestId) !== signature) { const result = error(409,'conflict','requestId already used'); return c.json(result.body,result.status); }
   let pending = store.get(request.requestId);
   if (!pending) {
    if (!store.hasCapacity()) { const result = error(409,'conflict','request_capacity'); return c.json(result.body,result.status); }
    const targetKey = request.target.kind === 'task' ? 'task:' + request.target.taskId : 'orchestrator';
    if (!locks.acquire(targetKey)) { const result = error(409,'conflict','target_busy'); return c.json(result.body,result.status); }
    pending = Promise.resolve().then(() => respond(request)).catch(err => err instanceof GatewayError ? gatewayErrorToResponse(err) : error(500,'internal','Internal error')).finally(() => locks.release(targetKey));
-   store.set(request.requestId,pending);
+   store.set(request.requestId,pending,signature);
   }
   const result = await pending;
   return c.json(result.body,result.status);
