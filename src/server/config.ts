@@ -19,11 +19,12 @@ export const configSchema = z.object({
  listen: z.object({ host: z.enum(['127.0.0.1','::1']).default('127.0.0.1'), port: z.number().int().min(1).max(65535).default(8790) }).strict().default({ host: '127.0.0.1', port: 8790 }),
  agtx: z.object({
   baseUrl: z.string().refine(isLoopbackUrl, 'must be an HTTP loopback root URL').transform(v => new URL(v).origin).default('http://127.0.0.1:8787'),
-  projectName: z.string().trim().min(1), timeoutMs: z.number().int().min(100).max(60000).default(5000)
+  projectName: z.string().trim().min(1).optional(), timeoutMs: z.number().int().min(100).max(60000).default(5000)
  }).strict(),
- orchestrator: z.object({ tmuxSocket: target, session: target, window: target }).strict(),
+ orchestrator: z.object({ tmuxSocket: target.default('agtx'), session: target.optional(), window: target.default('orchestrator') }).strict().default({ tmuxSocket: 'agtx', window: 'orchestrator' }),
+ orchestrators: z.record(z.string(), z.object({ tmuxSocket: target.optional(), session: target, window: target.optional() }).strict()).default({}),
  limits: z.object({ instructionMaxChars: z.number().int().min(1).max(100000).default(DEFAULT_INSTRUCTION_MAX_CHARS) }).strict().default({ instructionMaxChars: DEFAULT_INSTRUCTION_MAX_CHARS })
-}).strict();
+}).strict().refine(v => !v.orchestrator.session || !!v.agtx.projectName, { message: 'orchestrator.session requires agtx.projectName' });
 export type HelmConfig = z.infer<typeof configSchema>;
 export function loadConfig({ env = process.env, cwd = process.cwd(), readFile = (p: string) => readFileSync(p, 'utf8') }: {
  env?: NodeJS.ProcessEnv; cwd?: string; readFile?: (path: string) => string;

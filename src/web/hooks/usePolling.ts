@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { projectPath } from '../api/paths.js';
 import type { StateResponse } from '../../shared/api.js';
 export interface ReadApi { apiGet<T>(path: string): Promise<T> }
 interface PollState<T> { data: T | null; lastSuccessAt: Date | null; error: Error | null; connected: boolean; failures: number }
@@ -44,4 +45,4 @@ export function usePolling<T>(fetcher: () => Promise<T>, { intervalMs, maxBackof
  },[intervalMs,maxBackoffMs,enabled,key]);
  return snapshot.key === key && enabled ? snapshot.value : initial<T>();
 }
-export function useAppState(api: ReadApi) { return usePolling(() => api.apiGet<StateResponse>('/api/state'),{ intervalMs: 3000 }); }
+export function useAppState(api: ReadApi, projectId: string) { return usePolling(async () => { const state = await api.apiGet<StateResponse>(projectPath(projectId,'state')); if (state.project.id !== projectId) throw new Error('Project response mismatch'); return state; },{ intervalMs: 3000, key: projectId }); }

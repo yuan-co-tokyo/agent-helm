@@ -19,19 +19,19 @@ pnpm install
 cp agent-helm.config.example.json agent-helm.config.json
 ```
 
-設定のプロジェクト名と tmux 対象を実環境に合わせます。以下の `my-project` はダミー値です。
+既定はマルチプロジェクトモードです。agtx の登録プロジェクトをトップで選び、各プロジェクトのボード・コンソールを開きます。
 
 ```json
 {
   "listen": { "host": "127.0.0.1", "port": 8790 },
-  "agtx": { "baseUrl": "http://127.0.0.1:8787", "projectName": "my-project", "timeoutMs": 5000 },
-  "orchestrator": { "tmuxSocket": "agtx", "session": "my-project", "window": "orchestrator" },
+  "agtx": { "baseUrl": "http://127.0.0.1:8787", "timeoutMs": 5000 },
+  "orchestrator": { "tmuxSocket": "agtx", "window": "orchestrator" },
   "limits": { "instructionMaxChars": 8000 }
 }
 ```
 
 1. 対象リポジトリで agtx TUI を起動し、対象プロジェクトと Orchestrator を確認します。
-2. 別端末で `agtx serve /path/to/my-project --host 127.0.0.1 --port 8787` を起動します。既に起動していれば再起動は不要です。今回の実環境は **8799** だったため、`agtx.baseUrl` も `http://127.0.0.1:8799` にしました。
+2. 別端末でパスを指定せず `agtx serve --host 127.0.0.1 --port 8787` を起動します。グローバルモードで全登録プロジェクトを取得します。既存サーバーを使う場合は起動モードとポートを確認し、`agtx.baseUrl` を合わせます。
 3. Agent Helm のディレクトリで次を実行し、http://127.0.0.1:8790 を開きます。
 
 ```sh
@@ -42,6 +42,45 @@ pnpm start
 ヘッダーでプロジェクト・agtx 到達・TUI 接続・Orchestrator 状態を照合してください。停止は逆順で、自分で起動した Agent Helm、agtx serve、TUI を終了します。他の作業で使っているプロセスや tmux ソケットは停止しないでください。
 
 開発時は `pnpm dev` で BFF と Vite を起動し、**http://127.0.0.1:5173** を開きます。`localhost:5173` は許可 Origin と異なるため `forbidden_origin` になります。Ctrl+C で両方停止します。`pnpm dev:server` / `pnpm dev:web` による個別起動も可能です。
+
+## プロジェクト選択と送信先設定
+
+一覧には名前、パス末尾、プロジェクトごとの TUI 接続、Orchestrator 状態、要対応・承認件数、取得時刻を表示します。TUI 未接続や削除済みパスの登録も残し、取得エラーはカードごとに表示します。10秒間隔で更新し、非表示タブでは停止します。
+
+`agtx.projectName` を指定すると単一プロジェクトに固定できます。既存の `projectName` と `orchestrator.session` を持つ設定も使えます。初回の空の URL ハッシュでは、固定プロジェクトまたは一覧が1件ならボードを直接開きます。「← プロジェクト一覧」で戻った後は一覧に留まります。
+
+```json
+{
+  "agtx": { "projectName": "my-project" },
+  "orchestrator": { "tmuxSocket": "agtx", "session": "my-project", "window": "orchestrator" }
+}
+```
+
+既定の送信先はソケット `agtx`、セッションはプロジェクト名の `.` / `:` を `_` に置換、ウィンドウは名前 `orchestrator` です。ウィンドウ番号には依存しません。英数字・ハイフン・アンダースコア以外が残る名前は推測せず `not_found / session_unresolved` とし、次のように上書きします。
+
+```json
+{
+  "agtx": {},
+  "orchestrator": { "tmuxSocket": "agtx" },
+  "orchestrators": {
+    "日本語プロジェクト": { "session": "explicit-session", "window": "orchestrator" }
+  }
+}
+```
+
+`orchestrators[プロジェクト名]` が最優先です。複数プロジェクトが同じ socket/session/window に解決されると、両方の Orchestrator 送信を `target_collision` で拒否します。グローバルモードでの `orchestrator.session` は設定エラーです。
+
+## API
+
+- `GET /api/session`: CSRF、バージョン、`target.fixedProjectName`。
+- `GET /api/projects`: プロジェクト一覧・接続・件数。
+- `GET /api/projects/:pid/state`: 対象の状態。`project.id/name` を含む。
+- `GET /api/projects/:pid/tasks/:tid`: タスク詳細・ペイン・承認。
+- `GET /api/projects/:pid/orchestrator/screen`: Orchestrator 画面。
+- `POST /api/projects/:pid/orchestrator/instructions`: `{projectId,text,requestId}`。
+- `POST /api/projects/:pid/approvals/respond`: `{projectId,target,fingerprint,key,requestId}`。
+
+旧 `/api/state`、`/api/tasks/...`、`/api/orchestrator/...`、`/api/approvals/respond` は削除され、404 を返します。POST の `projectId` はパスと一致必須です。未知のプロジェクト ID は404、UUID 形式不正は400です。
 
 ## 操作
 
@@ -91,7 +130,7 @@ Vitest は HTTP モック・UI・検証専用 tmux を使います。E2E は Chr
 - `not_found` / `ambiguous`: tmux の socket/session/window と単一ペイン構成を確認します。Agent Helm は自動で対象を選び直しません。
 - 「切断中」「到達不可」: agtx の実際のポート、TUI、設定を確認します。プロジェクト名は一意に解決できる必要があります。
 - PR 状態不明: `gh` の認証・ネットワークを確認します。テスト結果は未取得として表示し、ペインの表示を成功判定へ変換しません。
-- リクエスト ID の重複排除は BFF プロセス内だけです。再起動や履歴上限後には保持されません。
+- リクエスト ID の重複排除は BFF プロセス内・プロジェクトごとです。再起動、履歴上限、宛先変更、32件のプロジェクトキャッシュからの退避後には保持されません。進行中のリクエストがあるプロジェクトは退避しません。
 - agtx `/input` の `delivered:true` はキー配送を示し、承認の受理を保証しません。送信後に画面を再取得し、同じ承認が残ると「画面が変わっていません」と表示します。自動再送はしません。
 - Codex trust（`enter continue`）は数字で選択し、同じ承認のカーソルが選択肢に一致した場合だけ Enter を送ります。exec 承認は数字のみです。
 - 新規プロジェクトは事前に `claude` / `codex` でリポジトリを信頼してください。auto_trust=false では Claude の trust 画面に `/exit` が入り、Codex が起動しない事例があります。

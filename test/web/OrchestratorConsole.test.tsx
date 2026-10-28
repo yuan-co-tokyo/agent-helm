@@ -7,11 +7,11 @@ import type { OrchestratorScreenResponse, SessionResponse } from '../../src/shar
 import { isUuid } from '../../src/shared/constants.js';
 vi.mock('../../src/web/api/client.js',async importOriginal=>({...await importOriginal<object>(),apiGet:vi.fn(),apiPost:vi.fn()}));
 const pane:OrchestratorScreenResponse = {text:'terminal output',capturedAt:'2026-10-21T10:00:00Z',lines:1,source:'tmux',approval:null,inputReady:{ok:true}};
-const session:SessionResponse = {csrfToken:'token',target:{project:{name:'Project',id:null},orchestrator:{socket:'sock',session:'sess',window:'win'}},versions:{app:'1',agtxSupported:'1',agtx:null}};
+const session:SessionResponse = {csrfToken:'token',target:{fixedProjectName:'Project'},versions:{app:'1',agtxSupported:'1',agtx:null}};
 beforeEach(()=> { vi.mocked(apiGet).mockResolvedValue(pane); vi.mocked(apiPost).mockResolvedValue({outcome:'sent',requestId:'x'}); });
 afterEach(()=> { cleanup(); vi.resetAllMocks(); vi.useRealTimers(); });
 async function setup(maxChars=8000) {
- render(<OrchestratorConsole session={session} maxChars={maxChars} status={{state:'running',target:session.target.orchestrator,paneId:'%7',currentCommand:null,checkedAt:pane.capturedAt}} />);
+ render(<OrchestratorConsole project={{id:"11111111-1111-4111-8111-111111111111",name:"Project"}} session={session} maxChars={maxChars} status={{state:'running',target:{socket:'sock',session:'sess',window:'win'},paneId:'%7',currentCommand:null,checkedAt:pane.capturedAt}} />);
  await screen.findAllByText('terminal output');
  return screen.getByRole('textbox') as HTMLTextAreaElement;
 }
@@ -58,7 +58,7 @@ const approvalPane:OrchestratorScreenResponse = {...pane,inputReady:{ok:false},a
 const optionButton = ()=>screen.getByRole('button',{name:'[1] Yes 承認'}) as HTMLButtonElement;
 async function approvalSetup() {
  vi.useFakeTimers(); vi.mocked(apiGet).mockResolvedValue(approvalPane);
- render(<OrchestratorConsole session={session} />); await act(async()=>{});
+ render(<OrchestratorConsole project={{id:"11111111-1111-4111-8111-111111111111",name:"Project"}} session={session} />); await act(async()=>{});
 }
 function confirmApproval() { fireEvent.click(optionButton()); fireEvent.click(screen.getByRole('button',{name:'送信'})); }
 test('shares one screen poll and freezes the selected fingerprint while polling',async()=> {
@@ -68,7 +68,7 @@ test('shares one screen poll and freezes the selected fingerprint while polling'
  await act(async()=>{await vi.advanceTimersByTimeAsync(1500);}); expect(apiGet).toHaveBeenCalledTimes(2);
  expect(screen.queryByText('Changed?')).toBeNull();
  fireEvent.click(screen.getByRole('button',{name:'送信'})); await act(async()=>{});
- expect(apiPost).toHaveBeenCalledWith('/api/approvals/respond',expect.objectContaining({fingerprint:'original'}));
+ expect(apiPost).toHaveBeenCalledWith('/api/projects/11111111-1111-4111-8111-111111111111/approvals/respond',expect.objectContaining({fingerprint:'original'}));
 });
 test('holds unknown prompts through polls and failed verification',async()=> {
  await approvalSetup(); vi.mocked(apiPost).mockRejectedValue(new HelmApiError(0,'network'));

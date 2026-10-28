@@ -2,7 +2,7 @@ import type { AgtxKey, PaneSnapshot, PhaseStatus, SendOutcome, TaskStatus } from
 export type { AgtxKey } from '../../shared/api.js';
 export type AgtxPane = PaneSnapshot & { inputText?: string | null };
 export interface AgtxHealth { version: string; mode: string | null; projectCount: number | null; tuiConnected: boolean | null; fetchedAt: string }
-export interface ProjectRef { id: string; name: string; path: string | null }
+export interface ProjectRef { id: string; name: string; path: string | null; tuiConnected?: boolean | null; lastOpened?: string | null }
 export interface TaskSummary {
  id: string; title: string; status: TaskStatus; agent: string | null; plugin: string | null; cycle: number;
  branchName: string | null; prNumber: number | null; prUrl?: string | null; escalationNote: string | null;
@@ -30,3 +30,5 @@ export interface AgtxGateway {
  readPane(taskId: string, lines?: number): Promise<AgtxPane>;
  sendKey(taskId: string, key: AgtxKey): Promise<KeySendResult>;
 }
+
+export interface AgtxDirectory { readonly lastHealth: AgtxHealth | null; getHealth(): Promise<AgtxHealth>; listProjects(): Promise<ProjectRef[]> }

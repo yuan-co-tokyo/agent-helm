@@ -2,12 +2,10 @@ import { tailLines } from '../approval/normalize.js';
 import type { AgtxStatus, ApprovalPrompt, OrchestratorStatus, StateResponse, TaskDetailView, TaskView } from '../../shared/api.js';
 import { GatewayError } from '../agtx/types.js';
 import type { AgtxGateway, AgtxPane, TaskDetail, TaskSummary } from '../agtx/types.js';
-import type { AppDeps } from '../app.js';
 import type { Logger } from '../log.js';
 import type { OrchestratorAdapter } from '../orchestrator/types.js';
 import { gatewayErrorToResponse } from '../routes/errors.js';
 import { attentionFor, classifyTask, inputState, needsApprovalCheck, needsDetail, needsPaneCheck } from './classify.js';
-import { GhPrService } from './pr.js';
 import type { ApprovalDetector, PrLookup } from './types.js';
 const gatewayError = (error: unknown) => error instanceof GatewayError ? error : new GatewayError('unknown');
 export class StateUnavailableError extends Error {
@@ -26,22 +24,24 @@ export class StatusService {
  private async fetchState(): Promise<StateResponse> {
   const checkedAt = new Date(this.now()).toISOString();
   const [health, list, status] = await Promise.allSettled([
-   this.deps.gateway.getHealth(), this.deps.gateway.listTasks(), this.deps.orchestrator.getStatus()
+   this.deps.gateway.getHealth(), this.deps.gateway.resolveProject().then(() => this.deps.gateway.listTasks()), this.deps.orchestrator.getStatus()
   ]);
   const orchestrator: OrchestratorStatus = status.status === 'fulfilled' ? status.value : {
    state: 'error', target: this.deps.orchestrator.describeTarget(), paneId: null, currentCommand: null, reason: 'status_unavailable', checkedAt
   };
+  const project = this.deps.gateway.cachedProject;
   const lastHealth = health.status === 'fulfilled' ? health.value : this.deps.gateway.lastHealth;
   const agtx: AgtxStatus = { reachable: health.status === 'fulfilled', version: lastHealth?.version ?? null,
-   tuiConnected: health.status === 'fulfilled' ? health.value.tuiConnected : null, checkedAt };
+   tuiConnected: health.status === 'fulfilled' ? (project?.tuiConnected ?? health.value.tuiConnected) : null, checkedAt };
   if (health.status === 'rejected') agtx.error = gatewayErrorToResponse(gatewayError(health.reason)).body.error;
   if (list.status === 'rejected') {
    const error = gatewayError(list.reason);
    if (!this.snapshot) throw new StateUnavailableError(error);
    agtx.error = gatewayErrorToResponse(error).body.error;
-   return { fetchedAt: this.snapshot.fetchedAt, agtx, orchestrator,
+   return { project: this.snapshot.project, fetchedAt: this.snapshot.fetchedAt, agtx, orchestrator,
     tasks: this.snapshot.tasks.map(task => ({ ...task, displayState: 'disconnected' })), attention: this.snapshot.attention };
   }
+  if (!project) throw new StateUnavailableError(new GatewayError('project_not_found'));
   // Four workers bound both detail and pane reads while preserving list order.
   const results: { view: TaskView; item: ReturnType<typeof attentionFor>['item'] }[] = new Array(list.value.length);
   let next = 0;
@@ -65,7 +65,7 @@ export class StatusService {
     results[index] = { view, item: attentionFor(task, view.displayState, approval, agtx.tuiConnected).item };
    }
   }));
-  const result: StateResponse = { fetchedAt: new Date(this.now()).toISOString(), agtx, orchestrator,
+  const result: StateResponse = { project: { id: project.id, name: project.name }, fetchedAt: new Date(this.now()).toISOString(), agtx, orchestrator,
    tasks: results.map(r => r.view), attention: results.flatMap(r => r.item ? [r.item] : []) };
   this.snapshot = structuredClone(result);
   return result;
@@ -80,7 +80,7 @@ export class StatusService {
  }
  async getTaskDetail(id: string): Promise<TaskDetailView> {
   const [tuiConnected, tasks] = await Promise.all([
-   this.deps.gateway.getHealth().then(health => health.tuiConnected, () => null), this.deps.gateway.listTasks()
+   Promise.all([this.deps.gateway.getHealth(),this.deps.gateway.resolveProject()]).then(([health,project]) => project.tuiConnected ?? health.tuiConnected, () => null), this.deps.gateway.listTasks()
   ]);
   if (!tasks.some(task => task.id === id)) throw new GatewayError('not_found');
   const task = await this.deps.gateway.getTask(id);
@@ -97,14 +97,4 @@ export class StatusService {
    referencedTasks: task.referencedTasks, blockedReason: task.blockedReason, escalationNote: task.escalationNote,
    pane: pane ? { text: pane.text, capturedAt: pane.capturedAt, lines: pane.lines, source: pane.source } : null, paneError, approval, testResult: { status: 'not_available', source: 'pane' } };
  }
-}
-const services = new WeakMap<AppDeps, StatusService>();
-export function statusServiceFor(deps: AppDeps): StatusService {
- if (deps.statusService) return deps.statusService;
- let service = services.get(deps);
- if (!service) {
-  service = new StatusService({ gateway: deps.gateway, orchestrator: deps.orchestrator, pr: new GhPrService(), detector: deps.approvalDetector, logger: deps.logger });
-  services.set(deps, service);
- }
- return service;
 }

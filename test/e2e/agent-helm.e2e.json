@@ -5,12 +5,10 @@
   },
   "agtx": {
     "baseUrl": "http://127.0.0.1:8792",
-    "projectName": "agent-helm",
     "timeoutMs": 2000
   },
   "orchestrator": {
     "tmuxSocket": "agent-helm-test",
-    "session": "agent-helm",
     "window": "orchestrator"
   },
   "limits": {

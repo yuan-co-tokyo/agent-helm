@@ -3,7 +3,6 @@ import type { ApprovalPrompt, ApprovalTarget, TaskDetailView, TaskView } from '.
 import { isUuid, TERMINAL_ONLY_MESSAGE } from '../../shared/constants.js';
 import { formatTime, TASK_STATUS_LABELS } from '../state/labels.js';
 import { stripControl } from '../text.js';
-import { ApprovalPanel } from './ApprovalPanel.js';
 import { PrBadge, StatusBadge } from './StatusBadge.js';
 export interface TaskDetailProps { taskId: string | null; detail: TaskDetailView | null; summary?: TaskView | null; connected: boolean; lastSuccessAt: Date | string | null; error: Error | null; onClose: () => void; renderApproval?: (target: ApprovalTarget, prompt: ApprovalPrompt | null) => ReactNode }
 export function TaskDetail({ taskId, detail, summary, connected, lastSuccessAt, error, onClose, renderApproval }: TaskDetailProps) {
@@ -28,7 +27,7 @@ export function TaskDetail({ taskId, detail, summary, connected, lastSuccessAt, 
  {task && <StatusBadge state={task.displayState} />}</div>
  {!isUuid(taskId) && <p role="alert">不正なタスクIDです</p>}
  {isUuid(taskId) && !connected && <p role="alert">{error ? `切断中・${lastSuccessAt ? `最終取得 ${formatTime(lastSuccessAt)}` : '未取得'} (${error.message})` : '取得中…'}</p>}
- <div className="approval-slot">{isUuid(taskId) && (renderApproval ? renderApproval(target,detail?.approval ?? null) : <ApprovalPanel target={target}  />)}</div>
+ <div className="approval-slot">{isUuid(taskId) && (renderApproval ? renderApproval(target,detail?.approval ?? null) : null)}</div>
  <div className={!connected && detail ? 'is-stale' : ''}>
  {detail && <><section className="detail-section"><h3>概要</h3><dl className="detail-meta"><dt>フェーズ</dt><dd>{TASK_STATUS_LABELS[detail.status]}</dd><dt>cycle</dt><dd>{detail.cycle}</dd><dt>担当</dt><dd>{detail.agent ?? '未割当'}</dd><dt>ブランチ</dt><dd>{detail.branchName ?? '未取得'}</dd></dl><h3>説明</h3><p className="pre-line">{detail.description ?? '説明なし'}</p>
  {(detail.blockedReason || detail.displayState === 'blocked') && <p>ブロック理由: {detail.blockedReason ?? '理由不明'}</p>}

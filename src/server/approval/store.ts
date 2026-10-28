@@ -2,8 +2,9 @@ import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import type { ApiErrorBody, SendResult } from '../../shared/api.js';
 export interface StoredResponse { status: ContentfulStatusCode; body: SendResult | (ApiErrorBody & { option?: { key: string; label: string } }) }
 export class RequestStore {
- private entries = new Map<string,{ promise: Promise<StoredResponse>; expires: number; pending: boolean }>();
+ private entries = new Map<string,{ promise: Promise<StoredResponse>; expires: number; pending: boolean; signature?: string }>();
  constructor(private now = Date.now, private capacity = 500, private ttlMs = 600_000) {}
+ signature(id: string) { this.prune(); return this.entries.get(id)?.signature; }
  get(id: string) { this.prune(); return this.entries.get(id)?.promise; }
  private prune() {
   for (const [id,entry] of this.entries) if (!entry.pending && entry.expires <= this.now()) this.entries.delete(id);
@@ -16,9 +17,9 @@ export class RequestStore {
   }
   return false;
  }
- set(id: string, promise: Promise<StoredResponse>) {
+ set(id: string, promise: Promise<StoredResponse>, signature?: string) {
   if (!this.entries.has(id) && !this.hasCapacity()) throw new Error('Request store is full');
-  const entry = { promise, expires: Infinity, pending: true };
+  const entry = { signature, promise, expires: Infinity, pending: true };
   this.entries.set(id,entry);
   void promise.finally(() => {
    entry.pending = false; entry.expires = this.now() + this.ttlMs;
