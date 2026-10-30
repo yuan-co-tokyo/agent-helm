@@ -62,3 +62,13 @@ it('limits captured history plus visible screen to the requested lines',async ()
  const { adapter } = setup(async args => args[0] === 'capture-pane' ? 'a\nb\nc\nd\n\n' : undefined);
  expect((await adapter.readScreen(2)).text).toBe('c\nd');
 });
+it('treats a faint suggestion as an empty prompt but keeps typed text blocking',async () => {
+ const placeholder = '\x1b[39m❯ \x1b[2mデザインの成果物を見せて\x1b[0m\n';
+ const { adapter,calls } = setup(async args => args[0] === 'capture-pane' ? placeholder : undefined);
+ const screen = await adapter.inspectScreen();
+ expect(screen.text).toBe('❯ デザインの成果物を見せて'); expect(screen.inputReady).toEqual({ ok: true }); expect(screen).not.toHaveProperty('inputText');
+ expect(calls.find(c => c.args[0] === 'capture-pane')!.args).toContain('-e');
+ expect((await adapter.sendInstruction('hello')).outcome).toBe('sent');
+ const typed = setup(async args => args[0] === 'capture-pane' ? '\x1b[39m❯ 入力途中\x1b[0m\n' : undefined);
+ expect(await typed.adapter.sendInstruction('hello')).toEqual({ outcome: 'rejected', reason: 'input_not_empty' });
+});

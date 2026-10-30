@@ -4,7 +4,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { ORCHESTRATOR_KEYS, type OrchestratorKey, type OrchestratorTarget, type SendResult } from '../../shared/api.js';
 import { DEFAULT_INSTRUCTION_MAX_CHARS } from '../../shared/constants.js';
 import { clampLines } from '../agtx/schemas.js';
-import { stripAnsi } from '../text.js';
+import { stripAnsi, stripFaint } from '../text.js';
 import { ExecFileTmuxRunner, type TmuxRunner } from '../tmux/exec.js';
 import { resolvePane } from '../tmux/target.js';
 import { assessInputReady } from '../tmux/input-ready.js';
@@ -27,22 +27,27 @@ export class TmuxOrchestratorAdapter implements OrchestratorAdapter {
  async getStatus() { return { ...await this.resolve(), target: this.describeTarget(), checkedAt: new Date().toISOString() }; }
  private async capture(paneId: string, lines?: number) {
   const count = clampLines(lines);
-  const text = stripAnsi(await this.runner.run(['capture-pane','-p','-J','-t',paneId,'-S',`-${count}`])).replace(/\n+$/,'').split('\n').slice(-count).join('\n');
-  return { text, lines: count, source: 'tmux' as const, capturedAt: new Date().toISOString() };
+  const raw = await this.runner.run(['capture-pane','-p','-e','-J','-t',paneId,'-S',`-${count}`]);
+  const trim = (value: string) => value.replace(/\n+$/,'').split('\n').slice(-count).join('\n');
+  const text = trim(stripAnsi(raw));
+  // Faint prompt text is a suggestion placeholder, so input readiness is judged without it.
+  const inputText = trim(stripFaint(raw) ?? text);
+  return { screen: { text, lines: count, source: 'tmux' as const, capturedAt: new Date().toISOString() }, inputText };
  }
- async readScreen(lines?: number) {
+ private async readPane(lines?: number) {
   const pane = await this.resolve();
   if (pane.state !== 'running' || !pane.paneId) throw new OrchestratorError(pane.state === 'not_found' || pane.state === 'ambiguous' ? pane.state : 'tmux_error');
   try { return await this.capture(pane.paneId,lines); } catch { throw new OrchestratorError('tmux_error'); }
  }
+ async readScreen(lines?: number) { return (await this.readPane(lines)).screen; }
  async inspectScreen(lines?: number) {
-  const screen = await this.readScreen(lines);
+  const { screen, inputText } = await this.readPane(lines);
   const approval = this.detector.detect(screen.text,screen.capturedAt);
-  return { ...screen, approval, inputReady: assessInputReady(screen.text,{ approval }) };
+  return { ...screen, approval, inputReady: assessInputReady(inputText,{ approval }) };
  }
  private async after(paneId: string): Promise<Result> {
   await delay(this.opts.settleMs ?? 300);
-  try { return { outcome: 'sent', after: await this.capture(paneId) }; } catch { return { outcome: 'sent' }; }
+  try { return { outcome: 'sent', after: (await this.capture(paneId)).screen }; } catch { return { outcome: 'sent' }; }
  }
  async sendInstruction(text: string): Promise<Result> {
   const valid = validateInstruction(text,this.opts.maxChars ?? DEFAULT_INSTRUCTION_MAX_CHARS);
@@ -56,8 +61,8 @@ export class TmuxOrchestratorAdapter implements OrchestratorAdapter {
   let loaded = false;
   let attempted = false;
   try {
-   const screen = await this.capture(id);
-   const ready = assessInputReady(screen.text,{ approval: this.detector.detect(screen.text,screen.capturedAt) });
+   const { screen, inputText } = await this.capture(id);
+   const ready = assessInputReady(inputText,{ approval: this.detector.detect(screen.text,screen.capturedAt) });
    if (!ready.ok) return { outcome: 'rejected', reason: ready.reason };
    const unchanged = async () => { const next = await this.resolve(); return next.state === 'running' && next.paneId === id; };
    if (!await unchanged()) return { outcome: 'rejected', reason: 'target_changed' };
